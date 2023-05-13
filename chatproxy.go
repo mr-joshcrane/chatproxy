@@ -17,6 +17,7 @@ type ChatMessage struct {
 
 const RoleUser = "user"
 const RoleBot = "assistant"
+const RoleSystem = "system"
 
 type ChatGPTClient struct {
 	client      *openai.Client
@@ -36,6 +37,13 @@ func NewChatGPTClient(token string) (*ChatGPTClient, error) {
 	}, nil
 }
 
+func (c *ChatGPTClient) SetPurpose(prompt string) {
+	c.recordMessage(ChatMessage{
+		Content: prompt,
+		Role:    RoleSystem,
+	})
+}
+
 func (c *ChatGPTClient) GetCompletion() (string, error) {
 	messages := make([]openai.ChatCompletionMessage, len(c.chatHistory))
 	for i, message := range c.chatHistory {
@@ -44,10 +52,11 @@ func (c *ChatGPTClient) GetCompletion() (string, error) {
 			Role:    message.Role,
 		}
 	}
+
 	resp, err := c.client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model:    openai.GPT3Dot5Turbo,
+			Model:    openai.GPT4,
 			Messages: messages,
 		},
 	)
@@ -73,9 +82,16 @@ func Start() {
 	if err != nil {
 		panic(err)
 	}
+	
+	fmt.Fprintln(os.Stdout, "What is my purpose?")
 	scan := bufio.NewScanner(os.Stdin)
+
 	for scan.Scan() {
 		line := scan.Text()
+		if len(chatGPT.chatHistory) == 0 {
+			chatGPT.SetPurpose(line)
+			continue
+		}
 		message := ChatMessage{
 			Content: line,
 			Role:    RoleUser,
