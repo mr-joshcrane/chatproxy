@@ -38,7 +38,7 @@ func NewChatGPTClient(token string) (*ChatGPTClient, error) {
 }
 
 func (c *ChatGPTClient) SetPurpose(prompt string) {
-	c.recordMessage(ChatMessage{
+	c.RecordMessage(ChatMessage{
 		Content: prompt,
 		Role:    RoleSystem,
 	})
@@ -69,7 +69,7 @@ func (c *ChatGPTClient) GetCompletion() (string, error) {
 	return resp.Choices[0].Message.Content, nil
 }
 
-func (c *ChatGPTClient) recordMessage(message ChatMessage) {
+func (c *ChatGPTClient) RecordMessage(message ChatMessage) {
 	c.chatHistory = append(c.chatHistory, message)
 	if c.auditTrail != nil {
 		fmt.Fprintln(c.auditTrail, message)
@@ -82,7 +82,7 @@ func Start() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	fmt.Fprintln(os.Stdout, "What is my purpose?")
 	scan := bufio.NewScanner(os.Stdin)
 
@@ -96,7 +96,7 @@ func Start() {
 			Content: line,
 			Role:    RoleUser,
 		}
-		chatGPT.recordMessage(message)
+		chatGPT.RecordMessage(message)
 
 		if line == "exit" {
 			break
@@ -109,7 +109,7 @@ func Start() {
 			Content: reply,
 			Role:    RoleBot,
 		}
-		chatGPT.recordMessage(message)
+		chatGPT.RecordMessage(message)
 		fmt.Println(message)
 	}
 }
