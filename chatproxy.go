@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"os"
+	"strings"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -14,7 +16,6 @@ type ChatMessage struct {
 	Content string
 	Role    string
 }
-
 const RoleUser = "user"
 const RoleBot = "assistant"
 const RoleSystem = "system"
@@ -77,12 +78,11 @@ func (c *ChatGPTClient) RecordMessage(message ChatMessage) {
 }
 
 func Start() {
-	token := os.Getenv("OPENAI_API_KEY")
+	token := os.Getenv("OPENAPI_TOKEN")
 	chatGPT, err := NewChatGPTClient(token)
 	if err != nil {
 		panic(err)
 	}
-
 	fmt.Fprintln(os.Stdout, "What is my purpose?")
 	scan := bufio.NewScanner(os.Stdin)
 
@@ -96,8 +96,18 @@ func Start() {
 			Content: line,
 			Role:    RoleUser,
 		}
-		chatGPT.RecordMessage(message)
 
+		if strings.HasPrefix(line, ">") {
+			files, err  := MessagesFromFiles(line[1:])
+			if err != nil {
+				panic(err)
+			}
+			for _, file := range files {
+				chatGPT.RecordMessage(file)
+			}
+			continue
+		}
+		chatGPT.RecordMessage(message)
 		if line == "exit" {
 			break
 		}
@@ -112,4 +122,54 @@ func Start() {
 		chatGPT.RecordMessage(message)
 		fmt.Println(message)
 	}
+}
+
+func MessageFromFile(path string) (ChatMessage, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return ChatMessage{}, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	content := ""
+	for scanner.Scan() {
+		content += scanner.Text()
+	}
+	return ChatMessage{
+		Content: fmt.Sprintf("--%s--\n%s", path, content),
+		Role:    RoleUser,
+	}, nil
+}
+
+func MessagesFromFiles(path string) ([]ChatMessage, error) {
+	var messages []ChatMessage
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		
+		// Ignore hidden files
+		if filepath.Base(path)[0] == '.' {
+			if info.IsDir() {
+				return filepath.SkipDir // If it's a directory, skip it entirely
+			}
+			return nil // If it's a file, just skip this file
+		}
+
+		if !info.IsDir() { // check if it's a file and not a directory
+			m, err := MessageFromFile(path)
+			if err != nil {
+				return err
+			}
+			messages = append(messages, m)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return []ChatMessage{}, err
+	}
+	return messages, nil
 }

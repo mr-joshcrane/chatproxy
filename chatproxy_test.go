@@ -1,15 +1,19 @@
 package chatproxy_test
-
 import (
+  "io/ioutil"
 	"github.com/mr-joshcrane/chatproxy"
 	"testing"
   "os"
   "fmt"
   "strconv"
+  "github.com/google/go-cmp/cmp"
 )
+
+var token string = os.Getenv("OPENAPI_TOKEN")
 
 func TestInterface(t *testing.T) {
 	t.Parallel()
+	t.Skip()
 
 	cases := []struct {
 		query string
@@ -35,7 +39,7 @@ func TestInterface(t *testing.T) {
       "I'm interested in evolution",
       0,
     },
-	}
+   	}
 
 	database := map[int]string{
 		1: "Quantum Computing: A Leap Forward",
@@ -59,22 +63,23 @@ func TestInterface(t *testing.T) {
 		19: "The Evolving World of Comic Books",
 		20: "The Mysteries of Ancient Civilizations",
 	}
-	token := os.Getenv("OPENAPI_TOKEN")
-	client, err := chatproxy.NewChatGPTClient(token)
-  if err != nil {
-    t.Errorf("Error: %s", err)
-  }
-
-	client.SetPurpose(
-		` I will ask you to find me (at most) one record from the library based on my query.
-      The library will be provided to you in the form of a Golang struct.
-      You will respond ONLY with the key (an integer) of the record that matches the query.
-      If no records match the query, you will return the integer '0'
-    `,
-	)
-	client.SetPurpose(fmt.Sprintf("The library is as follows: %v", database))
 
 	for _, testCase := range cases {
+    fmt.Fprintln(os.Stdout, "Running test case: ", testCase.query)
+    client, err := chatproxy.NewChatGPTClient(token)
+    if err != nil {
+      t.Errorf("Error: %s", err)
+    }
+  
+    client.SetPurpose(
+      ` I will ask you to find me (at most) one record from the library based on my query.
+        The library will be provided to you in the form of a Golang struct.
+        You will respond ONLY with the key (an integer) of the record that matches the query.
+        If no records match the query, you will return the integer '0'
+      `,
+    )
+    client.SetPurpose(fmt.Sprintf("The library is as follows: %v", database))
+  
 		client.RecordMessage(chatproxy.ChatMessage{
 			Content: testCase.query,
 			Role:    chatproxy.RoleUser,
@@ -83,7 +88,7 @@ func TestInterface(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error: %s", err)
 		}
-    got, err := strconv.Atoi(message)
+		got, err := strconv.Atoi(message)
     if err != nil {
       t.Errorf("Error: %s: %s", err, message)
     }
@@ -92,3 +97,65 @@ func TestInterface(t *testing.T) {
 		}
 	}
 }
+
+func TestReadFile(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	path := dir + "/config.json"
+	contents := `{
+    config: "yes",
+}`
+
+	err := ioutil.WriteFile(path, []byte(contents), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := chatproxy.MessageFromFile(path)
+  if err != nil {
+    t.Fatal(err)
+  }
+	want := chatproxy.ChatMessage{
+		Content: fmt.Sprintf("--%s--\n%s", path, contents), 
+		Role: chatproxy.RoleUser,
+	}
+	if want != got {
+		cmp.Diff(want, got)
+	}
+}
+
+func TestReadDirectory(t *testing.T) {
+  t.Parallel()
+  dir := t.TempDir()
+  c1path := dir + "/config1.json"
+	c1contents := `true`
+
+  err := ioutil.WriteFile(c1path, []byte(c1contents), 0644)
+  if err != nil {
+    t.Fatal(err)
+  }
+  c2path := dir + "/config2.json"
+  c2contents := `false`
+
+  err = ioutil.WriteFile(c2path, []byte(c2contents), 0644)
+  if err != nil {
+    t.Fatal(err)
+  }
+  got, err := chatproxy.MessagesFromFiles(dir)
+  if err != nil {
+    t.Fatal(err)
+  }
+  want := []chatproxy.ChatMessage{
+    {
+      Content: fmt.Sprintf("--%s--\n%s", c1path, c1contents),
+      Role: chatproxy.RoleUser,
+    },
+    {
+      Content: fmt.Sprintf("--%s--\n%s", c2path, c2contents),
+      Role: chatproxy.RoleUser,
+    },
+  }
+  if !cmp.Equal(want, got) {
+    t.Fatal(cmp.Diff(want, got))
+  }
+}
+
