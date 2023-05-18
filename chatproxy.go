@@ -5,8 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/sashabaranov/go-openai"
@@ -16,9 +16,12 @@ type ChatMessage struct {
 	Content string
 	Role    string
 }
-const RoleUser = "user"
-const RoleBot = "assistant"
-const RoleSystem = "system"
+
+const (
+	RoleUser   = "user"
+	RoleBot    = "assistant"
+	RoleSystem = "system"
+)
 
 type ChatGPTClient struct {
 	client      *openai.Client
@@ -98,7 +101,7 @@ func Start() {
 		}
 
 		if strings.HasPrefix(line, ">") {
-			files, err  := MessagesFromFiles(line[1:])
+			files, err := MessagesFromFiles(line[1:])
 			if err != nil {
 				panic(err)
 			}
@@ -148,7 +151,7 @@ func MessagesFromFiles(path string) ([]ChatMessage, error) {
 		if err != nil {
 			return err
 		}
-		
+
 		// Ignore hidden files
 		if filepath.Base(path)[0] == '.' {
 			if info.IsDir() {
@@ -167,9 +170,18 @@ func MessagesFromFiles(path string) ([]ChatMessage, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return []ChatMessage{}, err
 	}
 	return messages, nil
 }
+
+func MessageToFile(message ChatMessage, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err 
+	}
+	fmt.Fprintln(file, message.Content)
+	return nil
+}
+
