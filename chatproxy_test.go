@@ -91,3 +91,31 @@ func TestWriteFile(t *testing.T) {
 		t.Fatalf("wanted %s, got %s", want, got)
 	}
 }
+
+func TestRollBackMessage_HandlesZeroLengthContexts(t *testing.T) {
+	t.Parallel()
+	client, err := chatproxy.NewChatGPTClient("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.RollbackLastMessage()	
+}
+
+func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
+	t.Parallel()
+	client, err := chatproxy.NewChatGPTClient("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.SetPurpose("This is the purpose")
+	client.RecordMessage(chatproxy.ChatMessage{
+		Content: "This is the content",
+		Role: chatproxy.RoleUser,
+	})
+	messages := client.RollbackLastMessage()
+	got := messages[len(messages)-1].Content
+	want := "This is the purpose"
+	if want != got {
+		t.Fatalf("wanted %s, got %s", want, got)
+	}
+}

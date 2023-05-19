@@ -65,6 +65,13 @@ func (c *ChatGPTClient) GetCompletion() (string, error) {
 		},
 	)
 	if err != nil {
+		err, ok := err.(*openai.APIError); if ok {
+			if err.HTTPStatusCode == 400 {
+				fmt.Fprintln(os.Stderr, err)
+				c.RollbackLastMessage()
+				return "Message rolled back out of context.", nil
+			}
+		}
 		return "", err
 	}
 	if len(resp.Choices) == 0 {
@@ -78,6 +85,16 @@ func (c *ChatGPTClient) RecordMessage(message ChatMessage) {
 	if c.auditTrail != nil {
 		fmt.Fprintln(c.auditTrail, message)
 	}
+}
+
+func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
+	if len(c.chatHistory) > 1 {
+		c.chatHistory = c.chatHistory[:len(c.chatHistory) -1]
+	}
+	if c.auditTrail != nil {
+		fmt.Fprintln(c.auditTrail, "Context Window Exceeded, rolling back.") 
+	}
+	return c.chatHistory
 }
 
 func Start() {
