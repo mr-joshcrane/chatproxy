@@ -48,7 +48,16 @@ func (c *ChatGPTClient) SetPurpose(prompt string) {
 	})
 }
 
-func (c *ChatGPTClient) GetCompletion() (string, error) {
+type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletionRequest
+
+func WithTokenLimit(tokenLimit int) CompletionOption {
+	return func(req *openai.ChatCompletionRequest) *openai.ChatCompletionRequest {
+		req.MaxTokens = tokenLimit
+		return req
+	}
+}
+
+func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) {
 	messages := make([]openai.ChatCompletionMessage, len(c.chatHistory))
 	for i, message := range c.chatHistory {
 		messages[i] = openai.ChatCompletionMessage{
@@ -56,14 +65,14 @@ func (c *ChatGPTClient) GetCompletion() (string, error) {
 			Role:    message.Role,
 		}
 	}
-
-	resp, err := c.client.CreateChatCompletion(
-		context.Background(),
-		openai.ChatCompletionRequest{
-			Model:    openai.GPT4,
-			Messages: messages,
-		},
-	)
+	req := openai.ChatCompletionRequest{
+		Model: openai.GPT4,
+		Messages: messages,
+	}
+	for _, opt := range opts {
+		opt(&req)
+	}
+	resp, err := c.client.CreateChatCompletion(context.Background(), req)
 	if err != nil {
 		err, ok := err.(*openai.APIError); if ok {
 			if err.HTTPStatusCode == 400 {
@@ -107,6 +116,7 @@ func Start() {
 	scan := bufio.NewScanner(os.Stdin)
 
 	for scan.Scan() {
+		var opts []CompletionOption
 		line := scan.Text()
 		if len(chatGPT.chatHistory) == 0 {
 			chatGPT.SetPurpose(line)
@@ -118,20 +128,17 @@ func Start() {
 		}
 
 		if strings.HasPrefix(line, ">") {
-			files, err := MessagesFromFiles(line[1:])
+			message, err = MessageFromFiles(line[1:])
 			if err != nil {
-				panic(err)
+				continue
 			}
-			for _, file := range files {
-				chatGPT.RecordMessage(file)
-			}
-			continue
+			opts = append(opts, WithTokenLimit(1))
 		}
 		chatGPT.RecordMessage(message)
 		if line == "exit" {
 			break
 		}
-		reply, err := chatGPT.GetCompletion()
+		reply, err := chatGPT.GetCompletion(opts...)
 		if err != nil {
 			panic(err)
 		}
@@ -144,10 +151,10 @@ func Start() {
 	}
 }
 
-func MessageFromFile(path string) (ChatMessage, error) {
+func MessageFromFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return ChatMessage{}, err
+		return "", err
 	}
 	defer file.Close()
 
@@ -156,14 +163,16 @@ func MessageFromFile(path string) (ChatMessage, error) {
 	for scanner.Scan() {
 		content += scanner.Text()
 	}
-	return ChatMessage{
-		Content: fmt.Sprintf("--%s--\n%s", path, content),
-		Role:    RoleUser,
-	}, nil
+	
+	message :=  fmt.Sprintf("--%s--\n%s\n", path, content)
+	return message, nil
 }
 
-func MessagesFromFiles(path string) ([]ChatMessage, error) {
-	var messages []ChatMessage
+func MessageFromFiles(path string) (ChatMessage, error) {
+	message := ChatMessage{
+		Content: "",
+		Role: RoleUser,
+	}
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -182,15 +191,14 @@ func MessagesFromFiles(path string) ([]ChatMessage, error) {
 			if err != nil {
 				return err
 			}
-			messages = append(messages, m)
+			message.Content += m
 		}
-
 		return nil
 	})
 	if err != nil {
-		return []ChatMessage{}, err
+		return ChatMessage{}, err
 	}
-	return messages, nil
+	return message, nil
 }
 
 func MessageToFile(message ChatMessage, path string) error {

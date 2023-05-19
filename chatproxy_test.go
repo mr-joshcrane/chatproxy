@@ -28,10 +28,7 @@ func TestReadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := chatproxy.ChatMessage{
-		Content: fmt.Sprintf("--%s--\n%s", path, contents),
-		Role:    chatproxy.RoleUser,
-	}
+	want := fmt.Sprintf("--%s--\n%s", path, contents)
 	if want != got {
 		cmp.Diff(want, got)
 	}
@@ -54,19 +51,15 @@ func TestReadDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := chatproxy.MessagesFromFiles(dir)
+	got, err := chatproxy.MessageFromFiles(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []chatproxy.ChatMessage{
-		{
-			Content: fmt.Sprintf("--%s--\n%s", c1path, c1contents),
-			Role:    chatproxy.RoleUser,
-		},
-		{
-			Content: fmt.Sprintf("--%s--\n%s", c2path, c2contents),
-			Role:    chatproxy.RoleUser,
-		},
+	c := fmt.Sprintf("--%s--\n%s\n--%s--\n%s\n", c1path, c1contents, c2path, c2contents)
+
+	want := chatproxy.ChatMessage{
+		Content: c,
+		Role:    chatproxy.RoleUser,
 	}
 	if !cmp.Equal(want, got) {
 		t.Fatal(cmp.Diff(want, got))
@@ -78,9 +71,12 @@ func TestWriteFile(t *testing.T) {
 	path := t.TempDir() + "/temp.txt"
 	messages := chatproxy.ChatMessage{
 		Content: "This is some file output.",
-		Role: chatproxy.RoleBot,
+		Role:    chatproxy.RoleBot,
 	}
-	chatproxy.MessageToFile(messages, path)
+	err := chatproxy.MessageToFile(messages, path)
+	if err != nil {
+		t.Fatal(err)
+	}
 	output, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +94,7 @@ func TestRollBackMessage_HandlesZeroLengthContexts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.RollbackLastMessage()	
+	client.RollbackLastMessage()
 }
 
 func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
@@ -110,7 +106,7 @@ func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
 	client.SetPurpose("This is the purpose")
 	client.RecordMessage(chatproxy.ChatMessage{
 		Content: "This is the content",
-		Role: chatproxy.RoleUser,
+		Role:    chatproxy.RoleUser,
 	})
 	messages := client.RollbackLastMessage()
 	got := messages[len(messages)-1].Content
