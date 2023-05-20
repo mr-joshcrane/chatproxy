@@ -26,7 +26,35 @@ const (
 type ChatGPTClient struct {
 	client      *openai.Client
 	chatHistory []ChatMessage
+	input       io.Reader
+	output      io.Writer
+	errorStream io.Writer
 	auditTrail  io.Writer
+}
+
+func (c *ChatGPTClient) Log(args ...any) {
+	fmt.Fprintln(c.output, args...)
+	if c.auditTrail != nil {
+		fmt.Fprintln(c.auditTrail, args...)
+	}
+}
+
+func (c *ChatGPTClient) Logf(format string, args ...any) {
+	format = format + "\n"
+	fmt.Fprintf(c.output, format, args...)
+	if c.auditTrail != nil {
+		fmt.Fprintf(c.auditTrail, format, args...)
+	}
+}
+
+func (c *ChatGPTClient) LogErr(err error) {
+	fmt.Fprintln(c.errorStream, err)
+}
+
+func (c *ChatGPTClient) LogAudit(args ...any) {
+	if c.auditTrail != nil {
+		fmt.Fprintln(c.auditTrail, args...)
+	}
 }
 
 func NewChatGPTClient(token string) (*ChatGPTClient, error) {
@@ -38,6 +66,9 @@ func NewChatGPTClient(token string) (*ChatGPTClient, error) {
 		client:      openai.NewClient(token),
 		chatHistory: []ChatMessage{},
 		auditTrail:  file,
+		input:       os.Stdin,
+		output:      os.Stdout,
+		errorStream: os.Stderr,
 	}, nil
 }
 
@@ -46,6 +77,7 @@ func (c *ChatGPTClient) SetPurpose(prompt string) {
 		Content: prompt,
 		Role:    RoleSystem,
 	})
+	c.LogAudit()
 }
 
 type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletionRequest
@@ -66,7 +98,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 		}
 	}
 	req := openai.ChatCompletionRequest{
-		Model: openai.GPT4,
+		Model:    openai.GPT4,
 		Messages: messages,
 	}
 	for _, opt := range opts {
@@ -74,9 +106,10 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	}
 	resp, err := c.client.CreateChatCompletion(context.Background(), req)
 	if err != nil {
-		err, ok := err.(*openai.APIError); if ok {
+		err, ok := err.(*openai.APIError)
+		if ok {
 			if err.HTTPStatusCode == 400 {
-				fmt.Fprintln(os.Stderr, err)
+				c.LogErr(err)
 				c.RollbackLastMessage()
 				return "Message rolled back out of context.", nil
 			}
@@ -86,40 +119,39 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("invalid response: %+v", resp)
 	}
-	return resp.Choices[0].Message.Content, nil
+	choice := resp.Choices[0].Message.Content
+	c.Log(choice)
+	return choice, nil
 }
 
 func (c *ChatGPTClient) RecordMessage(message ChatMessage) {
 	c.chatHistory = append(c.chatHistory, message)
-	if c.auditTrail != nil {
-		fmt.Fprintln(c.auditTrail, message)
-	}
+	c.LogAudit(message)
 }
 
 func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
 	if len(c.chatHistory) > 1 {
-		c.chatHistory = c.chatHistory[:len(c.chatHistory) -1]
+		c.chatHistory = c.chatHistory[:len(c.chatHistory)-1]
 	}
-	if c.auditTrail != nil {
-		fmt.Fprintln(c.auditTrail, "Context Window Exceeded, rolling back.") 
-	}
+	c.Log("Context Window Exceeded, rolling back.")
 	return c.chatHistory
 }
 
 func Start() {
 	token := os.Getenv("OPENAPI_TOKEN")
-	chatGPT, err := NewChatGPTClient(token)
+	c, err := NewChatGPTClient(token)
 	if err != nil {
-		panic(err)
+		c.LogErr(err)
+		os.Exit(1)
 	}
-	fmt.Fprintln(os.Stdout, "What is my purpose?")
-	scan := bufio.NewScanner(os.Stdin)
+	c.Log("How can I help?")
+	scan := bufio.NewScanner(c.input)
 
 	for scan.Scan() {
 		var opts []CompletionOption
 		line := scan.Text()
-		if len(chatGPT.chatHistory) == 0 {
-			chatGPT.SetPurpose(line)
+		if len(c.chatHistory) == 0 {
+			c.SetPurpose(line)
 			continue
 		}
 		message := ChatMessage{
@@ -132,22 +164,22 @@ func Start() {
 			if err != nil {
 				continue
 			}
-			opts = append(opts, WithTokenLimit(1))
+			opts = append(opts, WithTokenLimit(0))
 		}
-		chatGPT.RecordMessage(message)
+		c.RecordMessage(message)
 		if line == "exit" {
 			break
 		}
-		reply, err := chatGPT.GetCompletion(opts...)
+		reply, err := c.GetCompletion(opts...)
 		if err != nil {
-			panic(err)
+			c.LogErr(err)
+			os.Exit(1)
 		}
 		message = ChatMessage{
 			Content: reply,
 			Role:    RoleBot,
 		}
-		chatGPT.RecordMessage(message)
-		fmt.Println(message)
+		c.RecordMessage(message)
 	}
 }
 
@@ -163,15 +195,15 @@ func MessageFromFile(path string) (string, error) {
 	for scanner.Scan() {
 		content += scanner.Text()
 	}
-	
-	message :=  fmt.Sprintf("--%s--\n%s\n", path, content)
+
+	message := fmt.Sprintf("--%s--\n%s\n", path, content)
 	return message, nil
 }
 
 func MessageFromFiles(path string) (ChatMessage, error) {
 	message := ChatMessage{
 		Content: "",
-		Role: RoleUser,
+		Role:    RoleUser,
 	}
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -205,9 +237,8 @@ func MessageFromFiles(path string) (ChatMessage, error) {
 func MessageToFile(message ChatMessage, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
-		return err 
+		return err
 	}
 	fmt.Fprintln(file, message.Content)
 	return nil
 }
-
