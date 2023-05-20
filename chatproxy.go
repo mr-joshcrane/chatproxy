@@ -66,7 +66,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 		}
 	}
 	req := openai.ChatCompletionRequest{
-		Model: openai.GPT4,
+		Model:    openai.GPT4,
 		Messages: messages,
 	}
 	for _, opt := range opts {
@@ -74,7 +74,8 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	}
 	resp, err := c.client.CreateChatCompletion(context.Background(), req)
 	if err != nil {
-		err, ok := err.(*openai.APIError); if ok {
+		err, ok := err.(*openai.APIError)
+		if ok {
 			if err.HTTPStatusCode == 400 {
 				fmt.Fprintln(os.Stderr, err)
 				c.RollbackLastMessage()
@@ -98,10 +99,10 @@ func (c *ChatGPTClient) RecordMessage(message ChatMessage) {
 
 func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
 	if len(c.chatHistory) > 1 {
-		c.chatHistory = c.chatHistory[:len(c.chatHistory) -1]
+		c.chatHistory = c.chatHistory[:len(c.chatHistory)-1]
 	}
 	if c.auditTrail != nil {
-		fmt.Fprintln(c.auditTrail, "Context Window Exceeded, rolling back.") 
+		fmt.Fprintln(c.auditTrail, "Context Window Exceeded, rolling back.")
 	}
 	return c.chatHistory
 }
@@ -163,15 +164,15 @@ func MessageFromFile(path string) (string, error) {
 	for scanner.Scan() {
 		content += scanner.Text()
 	}
-	
-	message :=  fmt.Sprintf("--%s--\n%s\n", path, content)
+
+	message := fmt.Sprintf("--%s--\n%s\n", path, content)
 	return message, nil
 }
 
 func MessageFromFiles(path string) (ChatMessage, error) {
 	message := ChatMessage{
 		Content: "",
-		Role: RoleUser,
+		Role:    RoleUser,
 	}
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -204,9 +205,8 @@ func MessageFromFiles(path string) (ChatMessage, error) {
 func MessageToFile(message ChatMessage, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
-		return err 
+		return err
 	}
 	fmt.Fprintln(file, message.Content)
 	return nil
 }
-

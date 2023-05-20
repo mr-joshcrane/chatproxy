@@ -10,8 +10,6 @@ import (
 	"github.com/mr-joshcrane/chatproxy"
 )
 
-var token string = os.Getenv("OPENAPI_TOKEN")
-
 func TestReadFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
