@@ -191,6 +191,7 @@ func MessageFromFiles(path string) (ChatMessage, error) {
 			if err != nil {
 				return err
 			}
+			fmt.Fprintf(os.Stdout, "-> %s\n", path)
 			message.Content += m
 		}
 		return nil
