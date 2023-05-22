@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -32,18 +33,25 @@ type ChatGPTClient struct {
 	auditTrail  io.Writer
 }
 
-func (c *ChatGPTClient) Log(args ...any) {
-	fmt.Fprintln(c.output, args...)
-	if c.auditTrail != nil {
-		fmt.Fprintln(c.auditTrail, args...)
+func (c *ChatGPTClient) Log(role string, message string) {
+	m := ChatMessage{
+		Content: message,
+		Role:    role,
 	}
+	c.logWithFormatting(m)
 }
 
-func (c *ChatGPTClient) Logf(format string, args ...any) {
-	format = format + "\n"
-	fmt.Fprintf(c.output, format, args...)
-	if c.auditTrail != nil {
-		fmt.Fprintf(c.auditTrail, format, args...)
+func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
+	formatted := fmt.Sprintf("%s) %s", strings.ToUpper(m.Role), m.Content)
+	switch m.Role {
+	case RoleBot:
+		color.New(color.FgGreen).Fprintln(c.output, formatted) // Green for assistant
+	case RoleUser:
+		fmt.Fprintln(c.auditTrail, formatted)
+	case RoleSystem:
+		color.New(color.FgYellow).Fprintln(c.output, formatted) // Yellow for system
+	default:
+		fmt.Fprintln(c.output, formatted) // Default output with no color
 	}
 }
 
@@ -51,10 +59,12 @@ func (c *ChatGPTClient) LogErr(err error) {
 	fmt.Fprintln(c.errorStream, err)
 }
 
-func (c *ChatGPTClient) LogAudit(args ...any) {
-	if c.auditTrail != nil {
-		fmt.Fprintln(c.auditTrail, args...)
+func (c *ChatGPTClient) Prompt(prompts ...string) {
+	for _, prompt := range prompts {
+		formattedPrompt := fmt.Sprintf("SYSTEM) %s", prompt)
+		color.New(color.FgYellow).Fprintln(c.output, formattedPrompt) // Yellow for system
 	}
+	fmt.Fprint(c.output, "USER) ")
 }
 
 func NewChatGPTClient(token string) (*ChatGPTClient, error) {
@@ -73,18 +83,25 @@ func NewChatGPTClient(token string) (*ChatGPTClient, error) {
 }
 
 func (c *ChatGPTClient) SetPurpose(prompt string) {
-	c.RecordMessage(ChatMessage{
-		Content: prompt,
+	purpose := "SYSTEM PURPOSE: " + prompt
+	m := ChatMessage{
+		Content: purpose,
 		Role:    RoleSystem,
-	})
-	c.LogAudit()
+	}
+	if len(c.chatHistory) > 0 {
+		c.chatHistory[0] = m
+	} else {
+		c.chatHistory = append(c.chatHistory, m)
+	}
+	c.Log(RoleSystem, purpose)
 }
 
 type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletionRequest
 
-func WithTokenLimit(tokenLimit int) CompletionOption {
+func WithFixedResponse(response string) CompletionOption {
 	return func(req *openai.ChatCompletionRequest) *openai.ChatCompletionRequest {
-		req.MaxTokens = tokenLimit
+		req.MaxTokens = 1
+		req.Stop = []string{response}
 		return req
 	}
 }
@@ -111,29 +128,35 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 			if err.HTTPStatusCode == 400 {
 				c.LogErr(err)
 				c.RollbackLastMessage()
-				return "Message rolled back out of context.", nil
+				return fmt.Sprintf("Backing out of transaction: %s", err.Message), nil
 			}
 		}
 		return "", err
+	}
+	if req.Stop != nil && len(req.Stop) > 0 {
+		return req.Stop[0], nil
 	}
 	if len(resp.Choices) == 0 {
 		return "", fmt.Errorf("invalid response: %+v", resp)
 	}
 	choice := resp.Choices[0].Message.Content
-	c.Log(choice)
 	return choice, nil
 }
 
-func (c *ChatGPTClient) RecordMessage(message ChatMessage) {
-	c.chatHistory = append(c.chatHistory, message)
-	c.LogAudit(message)
+func (c *ChatGPTClient) RecordMessage(role string, message string) {
+	m := ChatMessage{
+		Content: message,
+		Role:    role,
+	}
+	c.chatHistory = append(c.chatHistory, m)
+	c.Log(role, message)
 }
 
 func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
 	if len(c.chatHistory) > 1 {
 		c.chatHistory = c.chatHistory[:len(c.chatHistory)-1]
 	}
-	c.Log("Context Window Exceeded, rolling back.")
+	c.Log(RoleSystem, "Last message rolled back")
 	return c.chatHistory
 }
 
@@ -144,7 +167,7 @@ func Start() {
 		c.LogErr(err)
 		os.Exit(1)
 	}
-	c.Log("How can I help?")
+	c.Prompt("Please describe the purpose of this assistant.")
 	scan := bufio.NewScanner(c.input)
 
 	for scan.Scan() {
@@ -152,21 +175,37 @@ func Start() {
 		line := scan.Text()
 		if len(c.chatHistory) == 0 {
 			c.SetPurpose(line)
+			c.Prompt()
 			continue
 		}
-		message := ChatMessage{
-			Content: line,
-			Role:    RoleUser,
-		}
-
 		if strings.HasPrefix(line, ">") {
-			message, err = MessageFromFiles(line[1:])
+			line, err = MessageFromFiles(line[1:])
 			if err != nil {
+				c.LogErr(err)
+				c.Prompt()
 				continue
 			}
-			opts = append(opts, WithTokenLimit(0))
+			opts = append(opts, WithFixedResponse("Files receieved!"))
 		}
-		c.RecordMessage(message)
+		if strings.HasPrefix(line, "<") {
+			path, line, ok := strings.Cut(line[1:], " "); if !ok {
+				c.LogErr(err)
+				c.Prompt()
+				continue
+			}
+			c.RecordMessage(RoleUser, line)
+			code, err := c.GetCompletion()
+			if err != nil {
+				c.LogErr(err)
+				c.Prompt()
+				continue
+			}
+			MessageToFile(code, path)
+			c.Prompt()
+			continue
+			
+		}
+		c.RecordMessage(RoleUser, line)
 		if line == "exit" {
 			break
 		}
@@ -175,11 +214,8 @@ func Start() {
 			c.LogErr(err)
 			os.Exit(1)
 		}
-		message = ChatMessage{
-			Content: reply,
-			Role:    RoleBot,
-		}
-		c.RecordMessage(message)
+		c.RecordMessage(RoleBot, reply)
+		c.Prompt()
 	}
 }
 
@@ -200,11 +236,8 @@ func MessageFromFile(path string) (string, error) {
 	return message, nil
 }
 
-func MessageFromFiles(path string) (ChatMessage, error) {
-	message := ChatMessage{
-		Content: "",
-		Role:    RoleUser,
-	}
+func MessageFromFiles(path string) (string, error) {
+	message := ""
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -224,21 +257,21 @@ func MessageFromFiles(path string) (ChatMessage, error) {
 				return err
 			}
 			fmt.Fprintf(os.Stdout, "-> %s\n", path)
-			message.Content += m
+			message += m
 		}
 		return nil
 	})
 	if err != nil {
-		return ChatMessage{}, err
+		return "", err
 	}
 	return message, nil
 }
 
-func MessageToFile(message ChatMessage, path string) error {
+func MessageToFile(content string, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(file, message.Content)
+	fmt.Fprintln(file, content)
 	return nil
 }

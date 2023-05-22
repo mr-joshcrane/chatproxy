@@ -55,12 +55,8 @@ func TestReadDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := fmt.Sprintf("--%s--\n%s\n--%s--\n%s\n", c1path, c1contents, c2path, c2contents)
+	want := fmt.Sprintf("--%s--\n%s\n--%s--\n%s\n", c1path, c1contents, c2path, c2contents)
 
-	want := chatproxy.ChatMessage{
-		Content: c,
-		Role:    chatproxy.RoleUser,
-	}
 	if !cmp.Equal(want, got) {
 		t.Fatal(cmp.Diff(want, got))
 	}
@@ -69,11 +65,7 @@ func TestReadDirectory(t *testing.T) {
 func TestWriteFile(t *testing.T) {
 	t.Parallel()
 	path := t.TempDir() + "/temp.txt"
-	messages := chatproxy.ChatMessage{
-		Content: "This is some file output.",
-		Role:    chatproxy.RoleBot,
-	}
-	err := chatproxy.MessageToFile(messages, path)
+	err := chatproxy.MessageToFile("This is some file output.", path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,13 +96,10 @@ func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.SetPurpose("This is the purpose")
-	client.RecordMessage(chatproxy.ChatMessage{
-		Content: "This is the content",
-		Role:    chatproxy.RoleUser,
-	})
+	client.RecordMessage(chatproxy.RoleUser, "This is the content")
 	messages := client.RollbackLastMessage()
 	got := messages[len(messages)-1].Content
-	want := "This is the purpose"
+	want := "SYSTEM PURPOSE: This is the purpose"
 	if want != got {
 		t.Fatalf("wanted %s, got %s", want, got)
 	}
