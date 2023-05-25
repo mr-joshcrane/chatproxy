@@ -45,6 +45,7 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 	formatted := fmt.Sprintf("%s) %s", strings.ToUpper(m.Role), m.Content)
 	switch m.Role {
 	case RoleBot:
+		fmt.Fprintln(c.auditTrail, formatted+"\n")
 		color.New(color.FgGreen).Fprintln(c.output, formatted) // Green for assistant
 	case RoleUser:
 		fmt.Fprintln(c.auditTrail, formatted)
@@ -65,6 +66,67 @@ func (c *ChatGPTClient) Prompt(prompts ...string) {
 		color.New(color.FgYellow).Fprintln(c.output, formattedPrompt) // Yellow for system
 	}
 	fmt.Fprint(c.output, "USER) ")
+}
+
+type Strategy interface {
+	Execute(*ChatGPTClient) error
+}
+
+type FileLoad struct{ input string }
+
+func (s FileLoad) Execute(c *ChatGPTClient) error {
+	line, err := c.MessageFromFiles(s.input[1:])
+	if err != nil {
+		c.LogErr(err)
+		return err
+	}
+	c.RecordMessage(RoleUser, line)
+	reply, err := c.GetCompletion(WithFixedResponse("Files receieved!"))
+	if err != nil {
+		c.LogErr(err)
+		return err
+	}
+	c.RecordMessage(RoleBot, reply)
+	return nil
+}
+
+type FileWrite struct{ input string }
+
+func (s FileWrite) Execute(c *ChatGPTClient) error {
+	path, line, ok := strings.Cut(s.input[1:], " ")
+	if !ok {
+		return fmt.Errorf("Need a file and a prompt to write a file")
+	}
+	c.RecordMessage(RoleUser, line)
+	code, err := c.GetCompletion()
+	if err != nil {
+		return err
+	}
+	return MessageToFile(code, path)
+}
+
+type Default struct{ input string }
+
+func (s Default) Execute(c *ChatGPTClient) error {
+	c.RecordMessage(RoleUser, s.input)
+	reply, err := c.GetCompletion()
+	if err != nil {
+		return err
+	}
+	fmt.Println(reply)
+	c.RecordMessage(RoleBot, reply)
+	return nil
+}
+
+func GetStrategy(input string) Strategy {
+	if strings.HasPrefix(input, ">") {
+		return FileLoad{input}
+	} else if strings.HasPrefix(input, "<") {
+		return FileWrite{input}
+	} else {
+		return Default{input}
+	}
+
 }
 
 type ClientOption func(*ChatGPTClient) *ChatGPTClient
@@ -186,52 +248,21 @@ func Start() {
 	scan := bufio.NewScanner(c.input)
 
 	for scan.Scan() {
-		var opts []CompletionOption
 		line := scan.Text()
 		if len(c.chatHistory) == 0 {
 			c.SetPurpose(line)
 			c.Prompt()
 			continue
 		}
-		if strings.HasPrefix(line, ">") {
-			line, err = c.MessageFromFiles(line[1:])
-			if err != nil {
-				c.LogErr(err)
-				c.Prompt()
-				continue
-			}
-			opts = append(opts, WithFixedResponse("Files receieved!"))
-		}
-		if strings.HasPrefix(line, "<") {
-			path, line, ok := strings.Cut(line[1:], " ")
-			if !ok {
-				c.LogErr(err)
-				c.Prompt()
-				continue
-			}
-			c.RecordMessage(RoleUser, line)
-			code, err := c.GetCompletion()
-			if err != nil {
-				c.LogErr(err)
-				c.Prompt()
-				continue
-			}
-			MessageToFile(code, path)
-			c.Prompt()
-			continue
-
-		}
-		c.RecordMessage(RoleUser, line)
 		if line == "exit" {
 			break
 		}
-		reply, err := c.GetCompletion(opts...)
+		c.Prompt()
+		strategy := GetStrategy(line)
+		err := strategy.Execute(c)
 		if err != nil {
 			c.LogErr(err)
-			os.Exit(1)
 		}
-		c.RecordMessage(RoleBot, reply)
-		c.Prompt()
 	}
 }
 

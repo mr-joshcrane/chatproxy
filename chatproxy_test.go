@@ -60,6 +60,7 @@ func TestReadDirectory(t *testing.T) {
 	if !cmp.Equal(want, got) {
 		t.Fatal(cmp.Diff(want, got))
 	}
+
 }
 
 func TestWriteFile(t *testing.T) {
@@ -97,6 +98,41 @@ func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
 	if want != got {
 		t.Fatalf("wanted %s, got %s", want, got)
 	}
+}
+
+func TestModeSwitch(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		description string
+		input       string
+		want        chatproxy.Strategy
+	}{
+		{
+			description: "User requests file load",
+			input:       ">file.txt",
+			want:        chatproxy.FileLoad{},
+		},
+		{
+			description: "User requests file writen out",
+			input:       "<file.txt and some random prompt",
+			want:        chatproxy.FileWrite{},
+		},
+		{
+			description: "Default case with no special action",
+			input:       "How many brackets do I have <><><><><>",
+			want:        chatproxy.Default{},
+		},
+	}
+	for _, tc := range cases {
+		got := chatproxy.GetStrategy(tc.input)
+		if diff := cmp.Diff(got, tc.want, cmp.Transformer("TypeOnly", func(i chatproxy.Strategy) string {
+			return fmt.Sprintf("%T", i)
+		})); diff != "" {
+			t.Errorf("(-want +got):\n%s", diff)
+		}
+
+	}
+
 }
 
 var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
