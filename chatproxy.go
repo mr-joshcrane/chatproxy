@@ -78,7 +78,7 @@ func WithOutput(output, err io.Writer) ClientOption {
 }
 
 func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error) {
-	
+
 	file, err := os.Create("audit.txt")
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error
 		output:      os.Stdout,
 		errorStream: os.Stderr,
 	}
-	for _, opt := range(opts) {
+	for _, opt := range opts {
 		c = opt(c)
 	}
 	return c, nil
