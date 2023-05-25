@@ -67,19 +67,34 @@ func (c *ChatGPTClient) Prompt(prompts ...string) {
 	fmt.Fprint(c.output, "USER) ")
 }
 
-func NewChatGPTClient(token string) (*ChatGPTClient, error) {
+type ClientOption func(*ChatGPTClient) *ChatGPTClient
+
+func WithOutput(output, err io.Writer) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.output = output
+		c.errorStream = err
+		return c
+	}
+}
+
+func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error) {
+	
 	file, err := os.Create("audit.txt")
 	if err != nil {
 		return nil, err
 	}
-	return &ChatGPTClient{
+	c := &ChatGPTClient{
 		client:      openai.NewClient(token),
 		chatHistory: []ChatMessage{},
 		auditTrail:  file,
 		input:       os.Stdin,
 		output:      os.Stdout,
 		errorStream: os.Stderr,
-	}, nil
+	}
+	for _, opt := range(opts) {
+		c = opt(c)
+	}
+	return c, nil
 }
 
 func (c *ChatGPTClient) SetPurpose(prompt string) {
@@ -179,7 +194,7 @@ func Start() {
 			continue
 		}
 		if strings.HasPrefix(line, ">") {
-			line, err = MessageFromFiles(line[1:])
+			line, err = c.MessageFromFiles(line[1:])
 			if err != nil {
 				c.LogErr(err)
 				c.Prompt()
@@ -188,7 +203,8 @@ func Start() {
 			opts = append(opts, WithFixedResponse("Files receieved!"))
 		}
 		if strings.HasPrefix(line, "<") {
-			path, line, ok := strings.Cut(line[1:], " "); if !ok {
+			path, line, ok := strings.Cut(line[1:], " ")
+			if !ok {
 				c.LogErr(err)
 				c.Prompt()
 				continue
@@ -203,7 +219,7 @@ func Start() {
 			MessageToFile(code, path)
 			c.Prompt()
 			continue
-			
+
 		}
 		c.RecordMessage(RoleUser, line)
 		if line == "exit" {
@@ -236,7 +252,7 @@ func MessageFromFile(path string) (string, error) {
 	return message, nil
 }
 
-func MessageFromFiles(path string) (string, error) {
+func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
 	message := ""
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -256,7 +272,7 @@ func MessageFromFiles(path string) (string, error) {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(os.Stdout, "-> %s\n", path)
+			fmt.Fprintf(c.output, "-> %s\n", path)
 			message += m
 		}
 		return nil

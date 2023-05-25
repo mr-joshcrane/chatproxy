@@ -2,6 +2,7 @@ package chatproxy_test
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -9,8 +10,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mr-joshcrane/chatproxy"
 )
-
-var token string = os.Getenv("OPENAPI_TOKEN")
 
 func TestReadFile(t *testing.T) {
 	t.Parallel()
@@ -36,6 +35,7 @@ func TestReadFile(t *testing.T) {
 
 func TestReadDirectory(t *testing.T) {
 	t.Parallel()
+	client := testClient(t)
 	dir := t.TempDir()
 	c1path := dir + "/config1.json"
 	c1contents := `true`
@@ -51,7 +51,7 @@ func TestReadDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := chatproxy.MessageFromFiles(dir)
+	got, err := client.MessageFromFiles(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,19 +82,13 @@ func TestWriteFile(t *testing.T) {
 
 func TestRollBackMessage_HandlesZeroLengthContexts(t *testing.T) {
 	t.Parallel()
-	client, err := chatproxy.NewChatGPTClient("")
-	if err != nil {
-		t.Fatal(err)
-	}
+	client := testClient(t)
 	client.RollbackLastMessage()
 }
 
 func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
 	t.Parallel()
-	client, err := chatproxy.NewChatGPTClient("")
-	if err != nil {
-		t.Fatal(err)
-	}
+	client := testClient(t)
 	client.SetPurpose("This is the purpose")
 	client.RecordMessage(chatproxy.RoleUser, "This is the content")
 	messages := client.RollbackLastMessage()
@@ -103,4 +97,15 @@ func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
 	if want != got {
 		t.Fatalf("wanted %s, got %s", want, got)
 	}
+}
+
+var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
+
+func testClient(t *testing.T) *chatproxy.ChatGPTClient {
+	client, err := chatproxy.NewChatGPTClient("", SuppressOutput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return client
+
 }
