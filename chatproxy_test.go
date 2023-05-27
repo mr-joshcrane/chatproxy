@@ -1,10 +1,12 @@
 package chatproxy_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -94,7 +96,7 @@ func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
 	client.RecordMessage(chatproxy.RoleUser, "This is the content")
 	messages := client.RollbackLastMessage()
 	got := messages[len(messages)-1].Content
-	want := "SYSTEM PURPOSE: This is the purpose"
+	want := "PURPOSE: This is the purpose"
 	if want != got {
 		t.Fatalf("wanted %s, got %s", want, got)
 	}
@@ -123,8 +125,9 @@ func TestModeSwitch(t *testing.T) {
 			want:        chatproxy.Default{},
 		},
 	}
+	client := testClient(t)
 	for _, tc := range cases {
-		got := chatproxy.GetStrategy(tc.input)
+		got := client.GetStrategy(tc.input)
 		if diff := cmp.Diff(got, tc.want, cmp.Transformer("TypeOnly", func(i chatproxy.Strategy) string {
 			return fmt.Sprintf("%T", i)
 		})); diff != "" {
@@ -135,13 +138,36 @@ func TestModeSwitch(t *testing.T) {
 
 }
 
+func TestTranscript(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	input := strings.NewReader("Return fixed responses\nQuestion?\nOther question?\nexit\n")
+	client := testClient(t, chatproxy.WithAudit(buf), chatproxy.WithInput(input), chatproxy.WithFixedResponse("Fixed response"))
+	client.Start()
+	want := []string{
+		"SYSTEM) PURPOSE: Return fixed responses",
+		"USER) Question?",
+		"ASSISTANT) Fixed response",
+		"USER) Other question?",
+		"ASSISTANT) Fixed response",
+		"USER) *exit*",
+		"",
+	}
+	got := strings.Split(buf.String(), "\n")
+	if !cmp.Equal(want, got) {
+		t.Fatalf(cmp.Diff(want, got))
+	}
+}
+
 var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
 
-func testClient(t *testing.T) *chatproxy.ChatGPTClient {
-	client, err := chatproxy.NewChatGPTClient("", SuppressOutput)
+func testClient(t *testing.T, opts ...chatproxy.ClientOption) *chatproxy.ChatGPTClient {
+	opts = append(opts, SuppressOutput)
+	client, err := chatproxy.NewChatGPTClient("", opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return client
 
 }
+

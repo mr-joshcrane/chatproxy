@@ -31,6 +31,7 @@ type ChatGPTClient struct {
 	output      io.Writer
 	errorStream io.Writer
 	auditTrail  io.Writer
+	fixedResponse string
 }
 
 func (c *ChatGPTClient) Log(role string, message string) {
@@ -45,11 +46,12 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 	formatted := fmt.Sprintf("%s) %s", strings.ToUpper(m.Role), m.Content)
 	switch m.Role {
 	case RoleBot:
-		fmt.Fprintln(c.auditTrail, formatted+"\n")
+		fmt.Fprintln(c.auditTrail, formatted)
 		color.New(color.FgGreen).Fprintln(c.output, formatted) // Green for assistant
 	case RoleUser:
 		fmt.Fprintln(c.auditTrail, formatted)
 	case RoleSystem:
+		fmt.Fprintln(c.auditTrail, formatted)
 		color.New(color.FgYellow).Fprintln(c.output, formatted) // Yellow for system
 	default:
 		fmt.Fprintln(c.output, formatted) // Default output with no color
@@ -81,7 +83,7 @@ func (s FileLoad) Execute(c *ChatGPTClient) error {
 		return err
 	}
 	c.RecordMessage(RoleUser, line)
-	reply, err := c.GetCompletion(WithFixedResponse("Files receieved!"))
+	reply, err := c.GetCompletion(WithFixedResponseAPIValidate("Files receieved!"))
 	if err != nil {
 		c.LogErr(err)
 		return err
@@ -113,12 +115,11 @@ func (s Default) Execute(c *ChatGPTClient) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(reply)
 	c.RecordMessage(RoleBot, reply)
 	return nil
 }
 
-func GetStrategy(input string) Strategy {
+func (c *ChatGPTClient) GetStrategy(input string) Strategy {
 	if strings.HasPrefix(input, ">") {
 		return FileLoad{input}
 	} else if strings.HasPrefix(input, "<") {
@@ -138,6 +139,27 @@ func WithOutput(output, err io.Writer) ClientOption {
 		return c
 	}
 }
+
+func WithAudit(audit io.Writer) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.auditTrail = audit
+		return c
+	}
+}
+
+func WithInput(input io.Reader) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.input = input
+		return c
+	}
+}
+
+func WithFixedResponse(response string) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.fixedResponse = response
+		return c
+	}
+} 
 
 func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error) {
 
@@ -160,7 +182,7 @@ func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error
 }
 
 func (c *ChatGPTClient) SetPurpose(prompt string) {
-	purpose := "SYSTEM PURPOSE: " + prompt
+	purpose := "PURPOSE: " + prompt
 	m := ChatMessage{
 		Content: purpose,
 		Role:    RoleSystem,
@@ -175,7 +197,7 @@ func (c *ChatGPTClient) SetPurpose(prompt string) {
 
 type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletionRequest
 
-func WithFixedResponse(response string) CompletionOption {
+func WithFixedResponseAPIValidate(response string) CompletionOption {
 	return func(req *openai.ChatCompletionRequest) *openai.ChatCompletionRequest {
 		req.MaxTokens = 1
 		req.Stop = []string{response}
@@ -184,6 +206,9 @@ func WithFixedResponse(response string) CompletionOption {
 }
 
 func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) {
+	if c.fixedResponse != "" {
+		return c.fixedResponse, nil
+	}
 	messages := make([]openai.ChatCompletionMessage, len(c.chatHistory))
 	for i, message := range c.chatHistory {
 		messages[i] = openai.ChatCompletionMessage{
@@ -198,6 +223,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	for _, opt := range opts {
 		opt(&req)
 	}
+
 	resp, err := c.client.CreateChatCompletion(context.Background(), req)
 	if err != nil {
 		err, ok := err.(*openai.APIError)
@@ -237,13 +263,7 @@ func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
 	return c.chatHistory
 }
 
-func Start() {
-	token := os.Getenv("OPENAPI_TOKEN")
-	c, err := NewChatGPTClient(token)
-	if err != nil {
-		c.LogErr(err)
-		os.Exit(1)
-	}
+func (c *ChatGPTClient) Start() {
 	c.Prompt("Please describe the purpose of this assistant.")
 	scan := bufio.NewScanner(c.input)
 
@@ -255,14 +275,15 @@ func Start() {
 			continue
 		}
 		if line == "exit" {
+			c.Log(RoleUser, "*exit*")
 			break
 		}
-		c.Prompt()
-		strategy := GetStrategy(line)
+		strategy := c.GetStrategy(line)
 		err := strategy.Execute(c)
 		if err != nil {
 			c.LogErr(err)
 		}
+		c.Prompt()
 	}
 }
 
