@@ -3,6 +3,7 @@ package chatproxy
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,12 +26,12 @@ const (
 )
 
 type ChatGPTClient struct {
-	client      *openai.Client
-	chatHistory []ChatMessage
-	input       io.Reader
-	output      io.Writer
-	errorStream io.Writer
-	auditTrail  io.Writer
+	client        *openai.Client
+	chatHistory   []ChatMessage
+	input         io.Reader
+	output        io.Writer
+	errorStream   io.Writer
+	auditTrail    io.Writer
 	fixedResponse string
 }
 
@@ -47,7 +48,6 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 	switch m.Role {
 	case RoleBot:
 		fmt.Fprintln(c.auditTrail, formatted)
-		color.New(color.FgGreen).Fprintln(c.output, formatted) // Green for assistant
 	case RoleUser:
 		fmt.Fprintln(c.auditTrail, formatted)
 	case RoleSystem:
@@ -159,7 +159,7 @@ func WithFixedResponse(response string) ClientOption {
 		c.fixedResponse = response
 		return c
 	}
-} 
+}
 
 func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error) {
 
@@ -219,12 +219,13 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	req := openai.ChatCompletionRequest{
 		Model:    openai.GPT4,
 		Messages: messages,
+		Stream:   true,
 	}
 	for _, opt := range opts {
 		opt(&req)
 	}
 
-	resp, err := c.client.CreateChatCompletion(context.Background(), req)
+	stream, err := c.client.CreateChatCompletionStream(context.Background(), req)
 	if err != nil {
 		err, ok := err.(*openai.APIError)
 		if ok {
@@ -236,14 +237,29 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 		}
 		return "", err
 	}
+	defer stream.Close()
 	if req.Stop != nil && len(req.Stop) > 0 {
 		return req.Stop[0], nil
 	}
-	if len(resp.Choices) == 0 {
-		return "", fmt.Errorf("invalid response: %+v", resp)
+	message := ""
+	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
+	for {
+		response, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			color.New(color.FgGreen).Fprintln(c.output, )
+			break
+		}
+
+		if err != nil {
+			break
+		}
+		token := response.Choices[0].Delta.Content
+		message += token
+
+		color.New(color.FgGreen).Fprint(c.output, token)
 	}
-	choice := resp.Choices[0].Message.Content
-	return choice, nil
+
+	return message, nil
 }
 
 func (c *ChatGPTClient) RecordMessage(role string, message string) {
@@ -287,10 +303,10 @@ func (c *ChatGPTClient) Start() {
 	}
 }
 
-func MessageFromFile(path string) (string, error) {
+func MessageFromFile(path string) (message string, tokenLen int, err error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	defer file.Close()
 
@@ -300,8 +316,9 @@ func MessageFromFile(path string) (string, error) {
 		content += scanner.Text()
 	}
 
-	message := fmt.Sprintf("--%s--\n%s\n", path, content)
-	return message, nil
+	message = fmt.Sprintf("--%s--\n%s\n", path, content)
+	tokenLen = CountTokens(message)
+	return message, tokenLen, nil
 }
 
 func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
@@ -320,11 +337,11 @@ func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
 		}
 
 		if !info.IsDir() { // check if it's a file and not a directory
-			m, err := MessageFromFile(path)
+			m, tl, err := MessageFromFile(path)
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(c.output, "-> %s\n", path)
+			fmt.Fprintf(c.output, "Tokens: %d -> %s\n", tl, path)
 			message += m
 		}
 		return nil

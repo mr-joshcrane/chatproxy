@@ -25,7 +25,7 @@ func TestReadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := chatproxy.MessageFromFile(path)
+	got, _, err := chatproxy.MessageFromFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
