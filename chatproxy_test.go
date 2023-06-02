@@ -170,4 +170,3 @@ func testClient(t *testing.T, opts ...chatproxy.ClientOption) *chatproxy.ChatGPT
 	return client
 
 }
-

@@ -246,7 +246,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
-			color.New(color.FgGreen).Fprintln(c.output, )
+			color.New(color.FgGreen).Fprintln(c.output)
 			break
 		}
 
@@ -317,12 +317,14 @@ func MessageFromFile(path string) (message string, tokenLen int, err error) {
 	}
 
 	message = fmt.Sprintf("--%s--\n%s\n", path, content)
-	tokenLen = CountTokens(message)
+	tokenLen = GuessTokens(message)
 	return message, tokenLen, nil
 }
 
 func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
 	message := ""
+	totalTokenLength := 0
+
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -343,12 +345,16 @@ func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
 			}
 			fmt.Fprintf(c.output, "Tokens: %d -> %s\n", tl, path)
 			message += m
+			totalTokenLength += tl
 		}
+
 		return nil
 	})
 	if err != nil {
 		return "", err
 	}
+	fmt.Fprintf(c.output, "Estimated Total Tokens: %d\n", totalTokenLength)
+
 	return message, nil
 }
 
@@ -359,4 +365,8 @@ func MessageToFile(content string, path string) error {
 	}
 	fmt.Fprintln(file, content)
 	return nil
+}
+
+func GuessTokens(input string) int {
+	return len(input) / 2
 }
