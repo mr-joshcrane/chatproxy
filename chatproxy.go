@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/sashabaranov/go-openai"
@@ -34,102 +32,6 @@ type ChatGPTClient struct {
 	auditTrail    io.Writer
 	fixedResponse string
 }
-
-func (c *ChatGPTClient) Log(role string, message string) {
-	m := ChatMessage{
-		Content: message,
-		Role:    role,
-	}
-	c.logWithFormatting(m)
-}
-
-func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
-	formatted := fmt.Sprintf("%s) %s", strings.ToUpper(m.Role), m.Content)
-	switch m.Role {
-	case RoleBot:
-		fmt.Fprintln(c.auditTrail, formatted)
-	case RoleUser:
-		fmt.Fprintln(c.auditTrail, formatted)
-	case RoleSystem:
-		fmt.Fprintln(c.auditTrail, formatted)
-		color.New(color.FgYellow).Fprintln(c.output, formatted) // Yellow for system
-	default:
-		fmt.Fprintln(c.output, formatted) // Default output with no color
-	}
-}
-
-func (c *ChatGPTClient) LogErr(err error) {
-	fmt.Fprintln(c.errorStream, err)
-}
-
-func (c *ChatGPTClient) Prompt(prompts ...string) {
-	for _, prompt := range prompts {
-		formattedPrompt := fmt.Sprintf("SYSTEM) %s", prompt)
-		color.New(color.FgYellow).Fprintln(c.output, formattedPrompt) // Yellow for system
-	}
-	fmt.Fprint(c.output, "USER) ")
-}
-
-type Strategy interface {
-	Execute(*ChatGPTClient) error
-}
-
-type FileLoad struct{ input string }
-
-func (s FileLoad) Execute(c *ChatGPTClient) error {
-	line, err := c.MessageFromFiles(s.input[1:])
-	if err != nil {
-		c.LogErr(err)
-		return err
-	}
-	c.RecordMessage(RoleUser, line)
-	reply, err := c.GetCompletion(WithFixedResponseAPIValidate("Files receieved!"))
-	if err != nil {
-		c.LogErr(err)
-		return err
-	}
-	c.RecordMessage(RoleBot, reply)
-	return nil
-}
-
-type FileWrite struct{ input string }
-
-func (s FileWrite) Execute(c *ChatGPTClient) error {
-	path, line, ok := strings.Cut(s.input[1:], " ")
-	if !ok {
-		return fmt.Errorf("Need a file and a prompt to write a file")
-	}
-	c.RecordMessage(RoleUser, line)
-	code, err := c.GetCompletion()
-	if err != nil {
-		return err
-	}
-	return MessageToFile(code, path)
-}
-
-type Default struct{ input string }
-
-func (s Default) Execute(c *ChatGPTClient) error {
-	c.RecordMessage(RoleUser, s.input)
-	reply, err := c.GetCompletion()
-	if err != nil {
-		return err
-	}
-	c.RecordMessage(RoleBot, reply)
-	return nil
-}
-
-func (c *ChatGPTClient) GetStrategy(input string) Strategy {
-	if strings.HasPrefix(input, ">") {
-		return FileLoad{input}
-	} else if strings.HasPrefix(input, "<") {
-		return FileWrite{input}
-	} else {
-		return Default{input}
-	}
-
-}
-
 type ClientOption func(*ChatGPTClient) *ChatGPTClient
 
 func WithOutput(output, err io.Writer) ClientOption {
@@ -243,6 +145,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	}
 	message := ""
 	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
+	err 
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -301,72 +204,4 @@ func (c *ChatGPTClient) Start() {
 		}
 		c.Prompt()
 	}
-}
-
-func MessageFromFile(path string) (message string, tokenLen int, err error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return "", 0, err
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	content := ""
-	for scanner.Scan() {
-		content += scanner.Text()
-	}
-
-	message = fmt.Sprintf("--%s--\n%s\n", path, content)
-	tokenLen = GuessTokens(message)
-	return message, tokenLen, nil
-}
-
-func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
-	message := ""
-	totalTokenLength := 0
-
-	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Ignore hidden files
-		if filepath.Base(path)[0] == '.' {
-			if info.IsDir() {
-				return filepath.SkipDir // If it's a directory, skip it entirely
-			}
-			return nil // If it's a file, just skip this file
-		}
-
-		if !info.IsDir() { // check if it's a file and not a directory
-			m, tl, err := MessageFromFile(path)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(c.output, "Tokens: %d -> %s\n", tl, path)
-			message += m
-			totalTokenLength += tl
-		}
-
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	fmt.Fprintf(c.output, "Estimated Total Tokens: %d\n", totalTokenLength)
-
-	return message, nil
-}
-
-func MessageToFile(content string, path string) error {
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(file, content)
-	return nil
-}
-
-func GuessTokens(input string) int {
-	return len(input) / 2
 }
