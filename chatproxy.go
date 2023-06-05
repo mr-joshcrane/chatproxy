@@ -140,29 +140,30 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 		return "", err
 	}
 	defer stream.Close()
-	if req.Stop != nil && len(req.Stop) > 0 {
+
+	discardStreamResp := req.Stop != nil && len(req.Stop) > 0
+	if discardStreamResp {
 		return req.Stop[0], nil
 	}
-	message := ""
+	return StreamResponse(c, stream)
+}
+func StreamResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
 	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
-	err
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
 			color.New(color.FgGreen).Fprintln(c.output)
-			break
+			return message, nil
 		}
 
 		if err != nil {
-			break
+			return "", err
 		}
 		token := response.Choices[0].Delta.Content
 		message += token
 
 		color.New(color.FgGreen).Fprint(c.output, token)
 	}
-
-	return message, nil
 }
 
 func (c *ChatGPTClient) RecordMessage(role string, message string) {
