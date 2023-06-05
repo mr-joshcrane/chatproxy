@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-
 type Strategy interface {
 	Execute(*ChatGPTClient) error
 }
@@ -43,7 +42,6 @@ func (s FileWrite) Execute(c *ChatGPTClient) error {
 	return MessageToFile(code, path)
 }
 
-
 type Default struct{ input string }
 
 func (s Default) Execute(c *ChatGPTClient) error {
@@ -66,4 +64,3 @@ func (c *ChatGPTClient) GetStrategy(input string) Strategy {
 	}
 
 }
-

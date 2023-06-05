@@ -145,7 +145,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	}
 	message := ""
 	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
-	err 
+	err
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
