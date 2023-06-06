@@ -6,6 +6,20 @@ import (
 	"strings"
 )
 
+const (
+	QuestionPrompt = `Given the above text, generate some reading comprehension questions.
+	If I respond to the questions, you will give me a score out of 10 and how I can improve my answer.
+	Use Bloom's Taxonomy (2001) to generate the questions. Do not generate questions about Bloom's Taxonomy..
+	Produce only the questions, the user will provide the answers.
+	
+	BOT: Q: What is the end goal of teaching.
+	USER: A: To know the answers to questions.
+	BOT: Feedback: 2/10 - This demonstrates only a surface understanding. 
+	USER: A: To transfer knowledge in such a way that the learner can apply it in new situations.
+	BOT: Feedback: 10/10 - This gets a the heart of the answer.
+	`
+)
+
 type Strategy interface {
 	Execute(*ChatGPTClient) error
 }
@@ -69,6 +83,8 @@ func (c *ChatGPTClient) GetStrategy(input string) Strategy {
 		return FileWrite{input}
 	} else if input == "exit" {
 		return Exit{}
+	} else if strings.HasPrefix(input, "?") {
+		return Default{QuestionPrompt}
 	} else {
 		return Default{input}
 	}

@@ -24,7 +24,65 @@ const (
 )
 
 type ChatGPTClient struct {
+	client        *openai.Clientpackage chatproxy
+
+import (
+	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/fatih/color"
+	"github.com/sashabaranov/go-openai"
+)
+
+type ChatMessage struct {
+	Content string
+	Role    string
+}
+
+const (
+	RoleUser   = "user"
+	RoleBot    = "assistant"
+	RoleSystem = "system"
+)
+
+type ChatGPTClient struct {
 	client        *openai.Client
+	chatHistory   []ChatMessage
+	input         io.Reader
+	output        io.Writer
+	errorStream   io.Writer
+	auditTrail    io.Writer
+	fixedResponse string
+}
+type ClientOption func(*ChatGPTClient) *ChatGPTClient
+
+func WithOutput(output, err io.Writer) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.output = output
+		c.errorStream = err
+		return c
+	}
+}
+
+func WithAudit(audit io.Writer) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.auditTrail = audit
+		return c
+	}
+}
+
+func WithInput(input io.Reader) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.input = input
+		return c
+	}
+}
+
+
 	chatHistory   []ChatMessage
 	input         io.Reader
 	output        io.Writer
