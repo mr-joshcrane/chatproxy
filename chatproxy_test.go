@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -21,7 +20,7 @@ func TestReadFile(t *testing.T) {
     config: "yes",
 }`
 
-	err := ioutil.WriteFile(path, []byte(contents), 0644)
+	err := os.WriteFile(path, []byte(contents), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,14 +41,14 @@ func TestReadDirectory(t *testing.T) {
 	c1path := dir + "/config1.json"
 	c1contents := `true`
 
-	err := ioutil.WriteFile(c1path, []byte(c1contents), 0644)
+	err := os.WriteFile(c1path, []byte(c1contents), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
 	c2path := dir + "/config2.json"
 	c2contents := `false`
 
-	err = ioutil.WriteFile(c2path, []byte(c2contents), 0644)
+	err = os.WriteFile(c2path, []byte(c2contents), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
