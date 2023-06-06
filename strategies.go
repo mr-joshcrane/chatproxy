@@ -2,6 +2,7 @@ package chatproxy
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -54,13 +55,21 @@ func (s Default) Execute(c *ChatGPTClient) error {
 	return nil
 }
 
+type Exit struct{}
+
+func (s Exit) Execute(c *ChatGPTClient) error {
+	c.Log(RoleUser, "*exit*")
+	return io.EOF
+}
+
 func (c *ChatGPTClient) GetStrategy(input string) Strategy {
 	if strings.HasPrefix(input, ">") {
 		return FileLoad{input}
 	} else if strings.HasPrefix(input, "<") {
 		return FileWrite{input}
+	} else if input == "exit" {
+		return Exit{}
 	} else {
 		return Default{input}
 	}
-
 }

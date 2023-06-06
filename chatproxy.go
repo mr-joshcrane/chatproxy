@@ -194,12 +194,11 @@ func (c *ChatGPTClient) Start() {
 			c.Prompt()
 			continue
 		}
-		if line == "exit" {
-			c.Log(RoleUser, "*exit*")
-			break
-		}
 		strategy := c.GetStrategy(line)
 		err := strategy.Execute(c)
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			c.LogErr(err)
 		}
