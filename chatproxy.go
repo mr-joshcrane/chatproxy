@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 
-	"github.com/fatih/color"
 	"github.com/sashabaranov/go-openai"
+	"github.com/cixtor/readability"
 )
 
 type ChatMessage struct {
@@ -148,11 +150,11 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	return StreamResponse(c, stream)
 }
 func StreamResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
-	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
+	// color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
-			color.New(color.FgGreen).Fprintln(c.output)
+			// color.New(color.FgGreen).Fprintln(c.output)
 			return message, nil
 		}
 
@@ -162,7 +164,7 @@ func StreamResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (mess
 		token := response.Choices[0].Delta.Content
 		message += token
 
-		color.New(color.FgGreen).Fprint(c.output, token)
+		// color.New(color.FgGreen).Fprint(c.output, token)
 	}
 }
 
@@ -204,4 +206,62 @@ func (c *ChatGPTClient) Start() {
 		}
 		c.Prompt()
 	}
+}
+
+func Ask(question string) (answer string, err error) {
+	token, ok := os.LookupEnv("OPENAI_TOKEN")
+	if !ok {
+		return "", errors.New("must have OPENAI_TOKEN env var set")
+	}
+
+	client, err := NewChatGPTClient(token)
+	if err != nil {
+		return "", err
+	}
+	return client.Ask(question)
+
+}
+
+func (c *ChatGPTClient) Ask(question string) (answer string, err error) {
+	c.RecordMessage(RoleUser, question)
+	return c.GetCompletion()
+}
+
+func TLDR(path string) (summary string, err error) {
+	token, ok := os.LookupEnv("OPENAI_TOKEN")
+	if !ok {
+		return "", errors.New("must have OPENAI_TOKEN env var set")
+	}
+	client, err := NewChatGPTClient(token)
+	if err != nil {
+		return "", err
+	}
+	return client.TLDR(path)
+}
+
+func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
+	var msg string
+	_, err  = url.Parse(path)
+	if err == nil {
+		resp, err := http.Get(path)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		r := readability.New()
+		article, err := r.Parse(resp.Body, path)
+		if err != nil {
+			return "", err
+		}
+		c.RecordMessage(RoleUser, article.TextContent)
+		
+	} else {
+		msg, err = c.MessageFromFiles(path)
+		if err != nil {
+			return "", err
+		}
+		c.RecordMessage(RoleUser, msg)
+	}
+	c.RecordMessage(RoleUser, "Please summarise the above as best you can. The shorter the better")
+	return c.GetCompletion()
 }

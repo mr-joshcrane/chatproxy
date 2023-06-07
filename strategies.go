@@ -9,7 +9,7 @@ import (
 const (
 	QuestionPrompt = `Given the above text, generate some reading comprehension questions.
 	If I respond to the questions, you will give me a score out of 10 and how I can improve my answer.
-	Use Bloom's Taxonomy (2001) to generate the questions. Do not generate questions about Bloom's Taxonomy..
+	Use Bloom's Taxonomy (2001) to generate the questions. Do not generate questions about Bloom's Taxonomy.
 	Produce only the questions, the user will provide the answers.
 	
 	BOT: Q: What is the end goal of teaching.
@@ -56,6 +56,7 @@ func (s FileWrite) Execute(c *ChatGPTClient) error {
 	}
 	return MessageToFile(code, path)
 }
+
 
 type Default struct{ input string }
 
