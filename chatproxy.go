@@ -9,9 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
-	"github.com/sashabaranov/go-openai"
 	"github.com/cixtor/readability"
+	"github.com/sashabaranov/go-openai"
 )
 
 type ChatMessage struct {
@@ -223,8 +224,48 @@ func Ask(question string) (answer string, err error) {
 }
 
 func (c *ChatGPTClient) Ask(question string) (answer string, err error) {
+	c.SetPurpose("Please answer the following question as best you can.")
 	c.RecordMessage(RoleUser, question)
 	return c.GetCompletion()
+}
+
+func Card(path string) (cards []string, err error) {
+	token, ok := os.LookupEnv("OPENAI_TOKEN")
+	if !ok {
+		return nil, errors.New("must have OPENAI_TOKEN env var set")
+	}
+
+	client, err := NewChatGPTClient(token)
+	if err != nil {
+		return nil, err
+	}
+	return client.Card(path)
+}
+
+func (c *ChatGPTClient) Card(path string) (cards []string, err error) {
+	c.SetPurpose(`Please generate flashcards from the user provided information.
+		Answers should be short.
+		A good flashcard look like this:
+		---
+		Question: What does 'Seperation of Concerns' mean?
+		Answer: It means that each function should do one thing and do it well.
+		---
+		Question: What does 'Liscov Substitution Principle' mean?
+		Answer: It means that any class that is the child of another class should be able to be used in place of the parent class.
+		---
+`)
+	msg, err := c.inputOutput(path)
+	if err != nil {
+		return nil, err
+	}
+	c.RecordMessage(RoleUser, msg)
+	msg, err = c.GetCompletion()
+	if err != nil {
+		return nil, err
+	}
+	cards = strings.Split(msg, "---")
+	return cards, nil
+
 }
 
 func TLDR(path string) (summary string, err error) {
@@ -239,9 +280,8 @@ func TLDR(path string) (summary string, err error) {
 	return client.TLDR(path)
 }
 
-func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
-	var msg string
-	_, err  = url.Parse(path)
+func (c *ChatGPTClient) inputOutput(path string) (msg string, err error) {
+	_, err = url.Parse(path)
 	if err == nil {
 		resp, err := http.Get(path)
 		if err != nil {
@@ -253,15 +293,23 @@ func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 		if err != nil {
 			return "", err
 		}
-		c.RecordMessage(RoleUser, article.TextContent)
-		
+		msg = article.TextContent
 	} else {
 		msg, err = c.MessageFromFiles(path)
 		if err != nil {
 			return "", err
 		}
-		c.RecordMessage(RoleUser, msg)
 	}
-	c.RecordMessage(RoleUser, "Please summarise the above as best you can. The shorter the better")
+	return msg, nil
+}
+
+func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
+	c.SetPurpose("Please summarise the provided text as best you can. The shorter the better.")
+	var msg string
+	msg, err = c.inputOutput(path)
+	if err != nil {
+		return "", err
+	}
+	c.RecordMessage(RoleUser, msg)
 	return c.GetCompletion()
 }
