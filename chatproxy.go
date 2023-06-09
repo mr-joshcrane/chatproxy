@@ -16,12 +16,7 @@ import (
 )
 
 func Chat() error {
-	token, ok := os.LookupEnv("OPENAI_TOKEN")
-	if !ok {
-		return errors.New("must have OPENAI_TOKEN env var set")
-	}
-
-	client, err := NewChatGPTClient(token, WithStreaming(true))
+	client, err := NewChatGPTClient(WithStreaming(true))
 	if err != nil {
 		return err
 	}
@@ -53,12 +48,7 @@ func (c *ChatGPTClient) Chat() {
 }
 
 func Ask(question string) (answer string, err error) {
-	token, ok := os.LookupEnv("OPENAI_TOKEN")
-	if !ok {
-		return "", errors.New("must have OPENAI_TOKEN env var set")
-	}
-
-	client, err := NewChatGPTClient(token)
+	client, err := NewChatGPTClient()
 	if err != nil {
 		return "", err
 	}
@@ -73,12 +63,7 @@ func (c *ChatGPTClient) Ask(question string) (answer string, err error) {
 }
 
 func Card(path string) (cards []string, err error) {
-	token, ok := os.LookupEnv("OPENAI_TOKEN")
-	if !ok {
-		return nil, errors.New("must have OPENAI_TOKEN env var set")
-	}
-
-	client, err := NewChatGPTClient(token)
+    client, err := NewChatGPTClient()
 	if err != nil {
 		return nil, err
 	}
@@ -112,11 +97,7 @@ func (c *ChatGPTClient) Card(path string) (cards []string, err error) {
 }
 
 func TLDR(path string) (summary string, err error) {
-	token, ok := os.LookupEnv("OPENAI_TOKEN")
-	if !ok {
-		return "", errors.New("must have OPENAI_TOKEN env var set")
-	}
-	client, err := NewChatGPTClient(token)
+	client, err := NewChatGPTClient()
 	if err != nil {
 		return "", err
 	}
@@ -162,11 +143,7 @@ func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 }
 
 func Commit() error {
-    token, err := getToken()
-	if err != nil {
-		return err
-	}
-    client, err := NewChatGPTClient(token)
+    client, err := NewChatGPTClient()
     if err != nil {
         return err
     }
@@ -205,10 +182,3 @@ func (c *ChatGPTClient) Commit() (summary string, err error) {
 	return c.GetCompletion()
 }
 
-func getToken() (string, error) {
-	token, ok := os.LookupEnv("OPENAI_TOKEN")
-	if !ok {
-		return "", errors.New("must have OPENAI_TOKEN env var set")
-	}
-    return token, nil
-}

@@ -70,8 +70,10 @@ func WithStreaming(streaming bool) ClientOption {
 	}
 }
 
-func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error) {
-
+func NewChatGPTClient( opts ...ClientOption) (*ChatGPTClient, error) {
+    token, ok := os.LookupEnv("OPENAI_TOKEN"); if !ok {
+        return nil, errors.New("must have OPENAI_TOKEN env var set")
+    }
 	file, err := os.Create("audit.txt")
 	if err != nil {
 		return nil, err

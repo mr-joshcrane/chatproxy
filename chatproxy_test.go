@@ -162,7 +162,7 @@ var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
 
 func testClient(t *testing.T, opts ...chatproxy.ClientOption) *chatproxy.ChatGPTClient {
 	opts = append(opts, SuppressOutput)
-	client, err := chatproxy.NewChatGPTClient("", opts...)
+	client, err := chatproxy.NewChatGPTClient(opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
