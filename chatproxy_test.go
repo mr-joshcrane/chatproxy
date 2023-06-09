@@ -142,7 +142,7 @@ func TestTranscript(t *testing.T) {
 	buf := new(bytes.Buffer)
 	input := strings.NewReader("Return fixed responses\nQuestion?\nOther question?\nexit\n")
 	client := testClient(t, chatproxy.WithAudit(buf), chatproxy.WithInput(input), chatproxy.WithFixedResponse("Fixed response"))
-	client.Start()
+	client.Chat()
 	want := []string{
 		"SYSTEM) PURPOSE: Return fixed responses",
 		"USER) Question?",
