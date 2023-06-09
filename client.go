@@ -156,7 +156,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	if c.streaming {
 		return StreamedResponse(c, stream)
 	}
-	return BuffedResponse(c, stream)
+	return BuffedResponse(stream)
 }
 func StreamedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
 	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
@@ -177,7 +177,7 @@ func StreamedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (me
 	}
 }
 
-func BuffedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
+func BuffedResponse(stream *openai.ChatCompletionStream) (message string, err error) {
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -189,7 +189,6 @@ func BuffedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (mess
 		}
 		token := response.Choices[0].Delta.Content
 		message += token
-
 	}
 }
 

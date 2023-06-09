@@ -178,11 +178,14 @@ func Commit() error {
 	fmt.Fprintln(client.output, "Accept Generated Message? (Y)es/(N)o \n"+commitMsg)
 	input := bufio.NewReader(client.input)
 	char, _, err := input.ReadRune()
+    if err != nil {
+        return err
+    }
 	r := strings.ToUpper(string(char))
 	if r != "Y" {
 		return errors.New("generated commit message not accepted")
 	}
-	cmd := exec.Command("git", "commit", "-m", fmt.Sprintf("%s", commitMsg))
+    cmd := exec.Command("git", "commit", "-m", commitMsg)
 	return cmd.Run()
 }
 
@@ -204,8 +207,5 @@ func (c *ChatGPTClient) Commit() (summary string, err error) {
 
 func IsValidURL(path string) bool {
 	_, err := url.Parse(path)
-	if err != nil {
-		return false
-	}
-	return true
+	return err == nil
 }
