@@ -146,6 +146,10 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 				c.RollbackLastMessage()
 				return fmt.Sprintf("Backing out of transaction: %s", err.Message), nil
 			}
+			if err.HTTPStatusCode == 401 {
+				c.LogErr(err)
+				return "", errors.New("Unauthorized. Please check your OPENAI_TOKEN env var")
+			}
 		}
 		return "", err
 	}
