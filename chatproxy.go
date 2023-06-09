@@ -143,6 +143,11 @@ func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 }
 
 func Commit() error {
+	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+	err := cmd.Run()
+	if err != nil {
+		return errors.New("must be in a git repository")
+	}
     client, err := NewChatGPTClient()
     if err != nil {
         return err
@@ -161,7 +166,7 @@ func Commit() error {
 	if r != "Y" {
 		return errors.New("generated commit message not accepted")
 	}
-	cmd := exec.Command("git", "commit", "-m", commitMsg)
+	cmd = exec.Command("git", "commit", "-m", commitMsg)
 	return cmd.Run()
 }
 
