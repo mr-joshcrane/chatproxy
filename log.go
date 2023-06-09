@@ -24,7 +24,6 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 		fmt.Fprintln(c.auditTrail, formatted)
 	case RoleSystem:
 		fmt.Fprintln(c.auditTrail, formatted)
-		color.New(color.FgYellow).Fprintln(c.output, formatted) // Yellow for system
 	default:
 		fmt.Fprintln(c.output, formatted) // Default output with no color
 	}
