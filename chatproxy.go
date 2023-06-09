@@ -162,14 +162,14 @@ func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 }
 
 func Commit() error {
-	token, ok := os.LookupEnv("OPENAI_TOKEN")
-	if !ok {
-		return errors.New("must have OPENAI_TOKEN env var set")
-	}
-	client, err := NewChatGPTClient(token)
+    token, err := getToken()
 	if err != nil {
 		return err
 	}
+    client, err := NewChatGPTClient(token)
+    if err != nil {
+        return err
+    }
 	commitMsg, err := client.Commit()
 	if err != nil {
 		return err
@@ -205,7 +205,10 @@ func (c *ChatGPTClient) Commit() (summary string, err error) {
 	return c.GetCompletion()
 }
 
-func IsValidURL(path string) bool {
-	_, err := url.Parse(path)
-	return err == nil
+func getToken() (string, error) {
+	token, ok := os.LookupEnv("OPENAI_TOKEN")
+	if !ok {
+		return "", errors.New("must have OPENAI_TOKEN env var set")
+	}
+    return token, nil
 }
