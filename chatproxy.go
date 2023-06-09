@@ -2,6 +2,7 @@ package chatproxy
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/cixtor/readability"
@@ -311,5 +313,46 @@ func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 		return "", err
 	}
 	c.RecordMessage(RoleUser, msg)
+	return c.GetCompletion()
+}
+
+func Commit() error {
+	token, ok := os.LookupEnv("OPENAI_TOKEN")
+	if !ok {
+		return errors.New("must have OPENAI_TOKEN env var set")
+	}
+	client, err := NewChatGPTClient(token)
+	if err != nil {
+		return err
+	}
+	commitMsg, err := client.Commit()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(client.output, "Accept Generated Message? (Y)es/(N)o \n" + commitMsg)
+	input := bufio.NewReader(client.input)
+	char, _, err := input.ReadRune()
+	r := strings.ToUpper(string(char))
+	if r != "Y"  {
+		return errors.New("generated commit message not accepted")
+	}
+	cmd := exec.Command("git",  "commit", "-m", fmt.Sprintf("%s", commitMsg) )
+	return cmd.Run()
+}
+
+
+func (c *ChatGPTClient) Commit() (summary string, err error) {
+	c.SetPurpose("Please read the git diff provided and write an appropriate commit message.")
+	cmd := exec.Command("git",  "diff", "--cached")
+	buf := bytes.Buffer{}
+	cmd.Stdout = &buf
+	err = cmd.Run()
+	if err != nil {
+		return "", err
+	}
+	if len(buf.String()) == 0 {
+		return "", errors.New("no files staged for commit")
+	}
+	c.RecordMessage(RoleUser, buf.String())
 	return c.GetCompletion()
 }
