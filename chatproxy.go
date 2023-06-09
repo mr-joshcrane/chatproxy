@@ -283,8 +283,17 @@ func TLDR(path string) (summary string, err error) {
 }
 
 func (c *ChatGPTClient) inputOutput(path string) (msg string, err error) {
-	_, err = url.Parse(path)
+	_, err = os.Stat(path)
 	if err == nil {
+		msg, err = c.MessageFromFiles(path)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		_, err  := url.ParseRequestURI(path)
+		if err != nil {
+			path = "https://" + path
+		}
 		resp, err := http.Get(path)
 		if err != nil {
 			return "", err
@@ -296,11 +305,6 @@ func (c *ChatGPTClient) inputOutput(path string) (msg string, err error) {
 			return "", err
 		}
 		msg = article.TextContent
-	} else {
-		msg, err = c.MessageFromFiles(path)
-		if err != nil {
-			return "", err
-		}
 	}
 	return msg, nil
 }
@@ -329,21 +333,20 @@ func Commit() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(client.output, "Accept Generated Message? (Y)es/(N)o \n" + commitMsg)
+	fmt.Fprintln(client.output, "Accept Generated Message? (Y)es/(N)o \n"+commitMsg)
 	input := bufio.NewReader(client.input)
 	char, _, err := input.ReadRune()
 	r := strings.ToUpper(string(char))
-	if r != "Y"  {
+	if r != "Y" {
 		return errors.New("generated commit message not accepted")
 	}
-	cmd := exec.Command("git",  "commit", "-m", fmt.Sprintf("%s", commitMsg) )
+	cmd := exec.Command("git", "commit", "-m", fmt.Sprintf("%s", commitMsg))
 	return cmd.Run()
 }
 
-
 func (c *ChatGPTClient) Commit() (summary string, err error) {
 	c.SetPurpose("Please read the git diff provided and write an appropriate commit message.")
-	cmd := exec.Command("git",  "diff", "--cached")
+	cmd := exec.Command("git", "diff", "--cached")
 	buf := bytes.Buffer{}
 	cmd.Stdout = &buf
 	err = cmd.Run()
@@ -355,4 +358,12 @@ func (c *ChatGPTClient) Commit() (summary string, err error) {
 	}
 	c.RecordMessage(RoleUser, buf.String())
 	return c.GetCompletion()
+}
+
+func IsValidURL(path string) bool {
+	_, err := url.Parse(path)
+	if err != nil {
+		return false
+	}
+	return true
 }
