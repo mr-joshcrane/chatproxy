@@ -15,7 +15,6 @@ import (
 	"github.com/cixtor/readability"
 )
 
-
 func Chat() error {
 	token, ok := os.LookupEnv("OPENAI_TOKEN")
 	if !ok {
@@ -178,19 +177,20 @@ func Commit() error {
 	fmt.Fprintln(client.output, "Accept Generated Message? (Y)es/(N)o \n"+commitMsg)
 	input := bufio.NewReader(client.input)
 	char, _, err := input.ReadRune()
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 	r := strings.ToUpper(string(char))
 	if r != "Y" {
 		return errors.New("generated commit message not accepted")
 	}
-    cmd := exec.Command("git", "commit", "-m", commitMsg)
+	cmd := exec.Command("git", "commit", "-m", commitMsg)
 	return cmd.Run()
 }
 
 func (c *ChatGPTClient) Commit() (summary string, err error) {
-	c.SetPurpose("Please read the git diff provided and write an appropriate commit message.")
+	c.SetPurpose(`Please read the git diff provided and write an appropriate commit message.
+	Focus on the lines that start with a + (line added) or - (line removed)`)
 	cmd := exec.Command("git", "diff", "--cached")
 	buf := bytes.Buffer{}
 	cmd.Stdout = &buf
