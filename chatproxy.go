@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/cixtor/readability"
+	"github.com/fatih/color"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -36,6 +37,7 @@ type ChatGPTClient struct {
 	errorStream   io.Writer
 	auditTrail    io.Writer
 	fixedResponse string
+	streaming     bool
 }
 type ClientOption func(*ChatGPTClient) *ChatGPTClient
 
@@ -68,6 +70,13 @@ func WithFixedResponse(response string) ClientOption {
 	}
 }
 
+func WithStreaming(streaming bool) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.streaming = streaming
+		return c
+	}
+}
+
 func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error) {
 
 	file, err := os.Create("audit.txt")
@@ -81,6 +90,7 @@ func NewChatGPTClient(token string, opts ...ClientOption) (*ChatGPTClient, error
 		input:       os.Stdin,
 		output:      os.Stdout,
 		errorStream: os.Stderr,
+		streaming:   false,
 	}
 	for _, opt := range opts {
 		c = opt(c)
@@ -150,14 +160,17 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	if discardStreamResp {
 		return req.Stop[0], nil
 	}
-	return StreamResponse(c, stream)
+	if c.streaming {
+		return StreamedResponse(c, stream)
+	}
+	return BuffedResponse(c, stream)
 }
-func StreamResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
-	// color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
+func StreamedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
+	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
-			// color.New(color.FgGreen).Fprintln(c.output)
+			color.New(color.FgGreen).Fprintln(c.output)
 			return message, nil
 		}
 
@@ -167,7 +180,23 @@ func StreamResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (mess
 		token := response.Choices[0].Delta.Content
 		message += token
 
-		// color.New(color.FgGreen).Fprint(c.output, token)
+		color.New(color.FgGreen).Fprint(c.output, token)
+	}
+}
+
+func BuffedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
+	for {
+		response, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return message, nil
+		}
+
+		if err != nil {
+			return "", err
+		}
+		token := response.Choices[0].Delta.Content
+		message += token
+
 	}
 }
 
@@ -209,6 +238,20 @@ func (c *ChatGPTClient) Start() {
 		}
 		c.Prompt()
 	}
+}
+
+func Chat() error {
+	token, ok := os.LookupEnv("OPENAI_TOKEN")
+	if !ok {
+		return errors.New("must have OPENAI_TOKEN env var set")
+	}
+
+	client, err := NewChatGPTClient(token, WithStreaming(true))
+	if err != nil {
+		return err
+	}
+	client.Start()
+	return nil
 }
 
 func Ask(question string) (answer string, err error) {
@@ -290,7 +333,7 @@ func (c *ChatGPTClient) inputOutput(path string) (msg string, err error) {
 			return "", err
 		}
 	} else {
-		_, err  := url.ParseRequestURI(path)
+		_, err := url.ParseRequestURI(path)
 		if err != nil {
 			path = "https://" + path
 		}
