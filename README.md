@@ -119,10 +119,13 @@ A brief summary of your website.
 ```
 
 ## OPENAI_TOKEN Environment Variable
-1. Purpose: The OPENAI_TOKEN is used to authenticate and authorize API access to OpenAI's GPT-4 services.
-2. Usage: Store the token as an environment variable (`OPENAI_TOKEN="YOUR_TOKEN"`) in your system or application, so that the library can access it automatically.
-3. Obtaining a token: You can get an API key by creating an account on OpenAI's platform at https://beta.openai.com/signup/. After signing up, visit the API Keys section in your account to obtain a token.
-4. User responsibilities: It is crucial to keep the token secret and secure, as it allows access to your OpenAI account and its services. Make sure not to share the token in public repositories or with unauthorized individuals. Additionally, be aware of usage limits and costs associated with OpenAI API services, as you will be billed according to your account's pricing plan.
+Purpose: The OPENAI_TOKEN is used to authenticate and authorize API access to OpenAI's GPT-4 services.
+
+Usage: Store the token as an environment variable (`OPENAI_TOKEN="YOUR_TOKEN"`) in your system or application, so that the library can access it automatically.
+
+Obtaining a token: You can get an API key by creating an account on OpenAI's platform at https://beta.openai.com/signup/. After signing up, visit the API Keys section in your account to obtain a token.
+
+User responsibilities: It is crucial to keep the token secret and secure, as it allows access to your OpenAI account and its services. Make sure not to share the token in public repositories or with unauthorized individuals. Additionally, be aware of usage limits and costs associated with OpenAI API services, as you will be billed according to your account's pricing plan.
 
 Always follow OpenAI's guidelines, terms, and conditions when using its services.
 
