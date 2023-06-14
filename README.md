@@ -1,81 +1,118 @@
-# Chat Proxy
+# Chatproxy
 
-Chat Proxy is a project that enables users to utilize the power of OpenAI's GPT-4 model for generating responses based on their input queries. It provides a simple interface for interacting with the model and storing the chat history along with an audit trail.
+This README ghostwritten by the `Chat` CLI tool backed by ChatGPT4
 
-## Features
+Chatproxy is a powerful Golang library that simplifies interactions with OpenAI's GPT-4 model, allowing developers to seamlessly integrate GPT-4 into their Go applications for various tasks. It comes with a collection of ready-to-use command-line tools that serve as examples of how to leverage the chatproxy library. Users can customize the API client, output formats, and authentication methods, making it an indispensable tool for Golang enthusiasts working with AI-powered document generation and processing.
 
-- Setup chat-purpose to give context to the conversation
-- Send and receive chat messages
-- Maintain conversation history
-- Respond to user queries based on the GPT-4 completion
-- Load configuration files and messages from filesystem
-- Write an audit trail to a text file
+## Key Features
 
-## Dependencies
+- Effortless integration with GPT-4 for your Go applications
+- Simple API client with customizable settings
+- Common functions for handling messages, conversation history, and errors
+- Collection of handy command-line tools: Ask, Card, Commit, Chat and TLDR
 
-The project requires the following dependencies:
+Unlock the power of GPT-4 in your Go projects with Chatproxy and take your applications to the next level.
 
-- Go 1.17 or newer
-- github.com/sashabaranov/go-openai (GPT-4 client library)
-- github.com/google/go-cmp (for test comparison)
+## Chatproxy Library
 
-## Installation
-
-> Make sure you have Go 1.17 or newer installed on your system.
-
-```sh
-git clone https://github.com/<your_username>/chatproxy.git
-cd chatproxy
-go build
+### Installation and Usage
+```bash
+go get -u github.com/mr-joshcrane/chatproxy
 ```
 
-## Usage
+```go
+package main
 
-1. Set up environment variable `OPENAPI_TOKEN` with your OpenAI API token:
+import (
+	"fmt"
+	"github.com/mr-joshcrane/chatproxy"
+)
 
-   ```sh
-   export OPENAPI_TOKEN=<your_openai_api_token>
-   ```
-
-2. Run the binary:
-
-   ```sh
-   ./chatproxy
-   ```
-
-3. Follow the command line instructions to start your conversation.
-
-## File Upload
-Chat Proxy supports uploading files to include their content as part of the conversation context. This feature allows users to provide additional information to the AI model by uploading text from files.
-
-To include files in your conversation:
-
-1. Place your text files in a folder that is accessible by the Chat Proxy program. The files should have a `.txt` extension and should not be hidden files (i.e., having filenames starting with a `.` character).
-
-2. During your conversation, prepend a `>` character to the file or folder path to upload its content as a message.
-
-```sh
->path/to/folder_or_file
+func main() {
+	answer, err := chatproxy.Ask("What is the capital of France?")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Println("Answer:", answer)
+}
 ```
 
-Example:
-
-Assuming you have a folder called `context_files` with multiple text files, you can simply upload these files by entering this line when prompted for a message:
-
-```sh
->context_files
+```bash
+Answer: Paris
 ```
 
-The contents of the text files will then be added as messages to the chat context with a user role, and GPT-4 will be able to consider them when responding to your queries.
+## Ask CLI Tool
+### Installation and Usage
+```bash
+go install github.com/mr-joshcrane/chatproxy/cmd/ask@latest
+ask "What is the capital of France?"
+The capital of France is Paris.
+```
 
-**Note:** You can use relative or absolute paths for files and folders. assistant}
+## Cards CLI Tool
+### Installation and Usage
+```bash
+go install github.com/mr-joshcrane/chatproxy/cmd/cards@latest
+cards path/to/your/file.txt
+Card 1: Example sentence from file.txt.
+Card 2: Another example from file.txt.
+```
 
+## Commit CLI Tool
+### Installation and Usage
+```bash
+go install github.com/mr-joshcrane/chatproxy/cmd/commit@latest
+commit
+Accept Generated Message? (Y)es/(N)o
+Add installation and usage instructions for Chatproxy library and CLI tools
+Generated commit message: "Implement new feature for xyz"
+```
 
+## Chat CLI Tool
 
-## Contributing
+### Installation and Usage
+```bash
+go install github.com/mr-joshcrane/chatproxy/cmd/chat@latest
+chat
+```
+```
+    SYSTEM) Please describe the purpose of this assistant.
+    USER) You help me write Golang documentation.
+    USER) >chatproxy
+    USER) What special commands are available in the Chat CLI tool and what do they
+    do?
+    USER) What special commands are availble in the chat CLI tool and what do they do?
+    ASSISTANT) In the chat CLI tool, there are THREE special commands:
+        1. `>filename.txt`: This command is used to load the contents of a local file into the chat session.
+        The text in the file will be used as input for the assistant, and it will base its response on that content.
+        To use this command, simply type `>` followed by the name of the file you want to load. For example:
 
-We welcome contributions to this project. If you'd like to contribute, please open an issue or submit a pull request.
+   >file.txt
 
-## License
+        2. `<filename.txt`: This command is used to write the assistant's response to a local file.
+        You can use this command to save the generated content for future reference.
+        To use this command, type `<` followed by the name of the file you want to save the response to,
+        and then enter your input prompt. For example:
 
-This project is licensed under the [MIT License](LICENSE.md).
+   <output.txt What is the capital of France?
+
+        3.  The `?` command in the chat CLI tool is used to generate comprehension questions based on the provided text.
+        It uses Bloom's Taxonomy (2001) to create questions that help assess the understanding of the given content.
+        To use this command, simply type `?` at the beginning of the chat input
+        and questions will be generated from the content of the current
+        conversation. To make sure you were really paying attention!
+
+These special commands help users extend the interactivity between the chat CLI tool and external files, making it more convenient to use different sources of information or store assistant responses for later use.
+
+```
+## TLDR CLI Tool
+### Installation and Usage
+```bash
+go install github.com/mr-joshcrane/chatproxy/cmd/tldr@latest
+tldr path/to/your/file.txt
+A brief summary of your file.
+
+tldr https://example.site.com
+A brief summary of your website.
+```
