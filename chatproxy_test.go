@@ -123,6 +123,11 @@ func TestModeSwitch(t *testing.T) {
 			input:       "How many brackets do I have <><><><><>",
 			want:        chatproxy.Default{},
 		},
+		{
+			description: "User requests comprehension questions",
+			input:       "?",
+			want:        chatproxy.Default{},
+		},
 	}
 	client := testClient(t)
 	for _, tc := range cases {
