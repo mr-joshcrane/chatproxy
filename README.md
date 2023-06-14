@@ -54,9 +54,10 @@ The capital of France is Paris.
 ### Installation and Usage
 ```bash
 go install github.com/mr-joshcrane/chatproxy/cmd/cards@latest
-cards path/to/your/file.txt
-Card 1: Example sentence from file.txt.
-Card 2: Another example from file.txt.
+cards path/to/your/file/README.md
+
+Question: What are special commands in the Chat CLI Tool?
+Answer: Three special commands: 1. ">filename.txt" to load a file, 2. "<filename.txt" to write response to a file, 3. "?" to generate comprehension questions.
 ```
 
 ## Commit CLI Tool
