@@ -63,7 +63,7 @@ func (c *ChatGPTClient) Ask(question string) (answer string, err error) {
 }
 
 func Card(path string) (cards []string, err error) {
-    client, err := NewChatGPTClient()
+	client, err := NewChatGPTClient()
 	if err != nil {
 		return nil, err
 	}
@@ -148,10 +148,10 @@ func Commit() error {
 	if err != nil {
 		return errors.New("must be in a git repository")
 	}
-    client, err := NewChatGPTClient()
-    if err != nil {
-        return err
-    }
+	client, err := NewChatGPTClient()
+	if err != nil {
+		return err
+	}
 	commitMsg, err := client.Commit()
 	if err != nil {
 		return err
@@ -186,4 +186,3 @@ func (c *ChatGPTClient) Commit() (summary string, err error) {
 	c.RecordMessage(RoleUser, buf.String())
 	return c.GetCompletion()
 }
-

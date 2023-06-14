@@ -85,7 +85,22 @@ func TestWriteFile(t *testing.T) {
 func TestRollBackMessage_HandlesZeroLengthContexts(t *testing.T) {
 	t.Parallel()
 	client := testClient(t)
-	client.RollbackLastMessage()
+	msg := client.RollbackLastMessage()
+	if !cmp.Equal(msg, []chatproxy.ChatMessage{}) {
+		t.Fatalf("wanted empty ChatMessageArray, got %v", msg)
+	}
+}
+
+func TestRollBackMessage_HandlesSingleMessageContexts(t *testing.T) {
+	t.Parallel()
+	client := testClient(t)
+	client.SetPurpose("This is the purpose")
+	messages := client.RollbackLastMessage()
+	got := messages[len(messages)-1].Content
+	want := "PURPOSE: This is the purpose"
+	if want != got {
+		t.Fatalf("wanted %s, got %s", want, got)
+	}
 }
 
 func TestRollBackMessage_HandlesMultiMessageContexts(t *testing.T) {
@@ -137,9 +152,7 @@ func TestModeSwitch(t *testing.T) {
 		})); diff != "" {
 			t.Errorf("(-want +got):\n%s", diff)
 		}
-
 	}
-
 }
 
 func TestTranscript(t *testing.T) {
