@@ -57,7 +57,10 @@ go install github.com/mr-joshcrane/chatproxy/cmd/cards@latest
 cards path/to/your/file/README.md
 
 Question: What are special commands in the Chat CLI Tool?
-Answer: Three special commands: 1. ">filename.txt" to load a file, 2. "<filename.txt" to write response to a file, 3. "?" to generate comprehension questions.
+Answer: Three special commands: 
+1. ">filename.txt" to load a file,
+2. "<filename.txt" to write response to a file,
+3. "?" to generate comprehension questions.
 ```
 
 ## Commit CLI Tool
