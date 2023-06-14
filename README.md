@@ -70,7 +70,6 @@ go install github.com/mr-joshcrane/chatproxy/cmd/commit@latest
 commit
 Accept Generated Message? (Y)es/(N)o
 Add installation and usage instructions for Chatproxy library and CLI tools
-Generated commit message: "Implement new feature for xyz"
 ```
 
 ## Chat CLI Tool
