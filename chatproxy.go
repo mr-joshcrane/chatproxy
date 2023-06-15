@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,38 +13,6 @@ import (
 
 	"github.com/cixtor/readability"
 )
-
-func Chat() error {
-	client, err := NewChatGPTClient(WithStreaming(true))
-	if err != nil {
-		return err
-	}
-	client.Chat()
-	return nil
-}
-
-func (c *ChatGPTClient) Chat() {
-	c.Prompt("Please describe the purpose of this assistant.")
-	scan := bufio.NewScanner(c.input)
-
-	for scan.Scan() {
-		line := scan.Text()
-		if len(c.chatHistory) == 0 {
-			c.SetPurpose(line)
-			c.Prompt()
-			continue
-		}
-		strategy := c.GetStrategy(line)
-		err := strategy.Execute(c)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			c.LogErr(err)
-		}
-		c.Prompt()
-	}
-}
 
 func Ask(question string) (answer string, err error) {
 	client, err := NewChatGPTClient()

@@ -1,10 +1,43 @@
 package chatproxy
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"strings"
 )
+
+func Chat() error {
+	client, err := NewChatGPTClient(WithStreaming(true))
+	if err != nil {
+		return err
+	}
+	client.Chat()
+	return nil
+}
+
+func (c *ChatGPTClient) Chat() {
+	c.Prompt("Please describe the purpose of this assistant.")
+	scan := bufio.NewScanner(c.input)
+
+	for scan.Scan() {
+		line := scan.Text()
+		if len(c.chatHistory) == 0 {
+			c.SetPurpose(line)
+			c.Prompt()
+			continue
+		}
+		strategy := c.GetStrategy(line)
+		err := strategy.Execute(c)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			c.LogErr(err)
+		}
+		c.Prompt()
+	}
+}
 
 const (
 	QuestionPrompt = `Given the above text, generate some reading comprehension questions.
@@ -56,7 +89,6 @@ func (s FileWrite) Execute(c *ChatGPTClient) error {
 	}
 	return MessageToFile(code, path)
 }
-
 
 type Default struct{ input string }
 
