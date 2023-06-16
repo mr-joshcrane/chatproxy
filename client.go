@@ -120,7 +120,7 @@ type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletion
 
 // WithFixedResponseAPIValidate still makes an API call (ensuring request and token length validation) but
 // enforces a specific response from the chatbot, ensuring a known output
-// and avoiding unpredictable or unneccessary responses during validation.
+// and avoiding unpredictable or unnecessary responses during validation.
 func WithFixedResponseAPIValidate(response string) CompletionOption {
 	return func(req *openai.ChatCompletionRequest) *openai.ChatCompletionRequest {
 		req.MaxTokens = 1
