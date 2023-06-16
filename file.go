@@ -3,9 +3,13 @@ package chatproxy
 import (
 	"bufio"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cixtor/readability"
 )
 
 func MessageFromFile(path string) (message string, tokenLen int, err error) {
@@ -104,4 +108,33 @@ func getAuditLogDir() (string, error) {
 	}
 
 	return appAuditLogDir, nil
+}
+
+// inputOutput takes a path, checks if it is a file or URL, and returns the
+// contents of the file or the text of the URL.
+func (c *ChatGPTClient) inputOutput(path string) (msg string, err error) {
+	_, err = os.Stat(path)
+	if err == nil {
+		msg, err = c.MessageFromFiles(path)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		_, err := url.ParseRequestURI(path)
+		if err != nil {
+			path = "https://" + path
+		}
+		resp, err := http.Get(path)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		r := readability.New()
+		article, err := r.Parse(resp.Body, path)
+		if err != nil {
+			return "", err
+		}
+		msg = article.TextContent
+	}
+	return msg, nil
 }
