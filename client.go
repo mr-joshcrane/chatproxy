@@ -11,17 +11,22 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+// ChatMessage represents a message in the chat, providing context and
+// a way to model conversation between different participant roles (e.g., user, bot, system).
 type ChatMessage struct {
 	Content string
 	Role    string
 }
 
+// Role constants that represent the role of the message sender
 const (
 	RoleUser   = "user"
 	RoleBot    = "assistant"
 	RoleSystem = "system"
 )
 
+// ChatGPTClient manages interactions with a GPT-based chatbot, providing a way
+// to organize the conversation, handle input/output, and maintain an audit trail.
 type ChatGPTClient struct {
 	client        *openai.Client
 	chatHistory   []ChatMessage
@@ -32,8 +37,13 @@ type ChatGPTClient struct {
 	fixedResponse string
 	streaming     bool
 }
+
+// ClientOption is used to flexibly configure the ChatGPTClient to meet various requirements
+// and use cases, such as custom input/output handling or error reporting.
 type ClientOption func(*ChatGPTClient) *ChatGPTClient
 
+// WithOutput allows customizing the output/error handling in the ChatGPTClient, making the client
+// more adaptable to different environments or reporting workflows.
 func WithOutput(output, err io.Writer) ClientOption {
 	return func(c *ChatGPTClient) *ChatGPTClient {
 		c.output = output
@@ -42,6 +52,8 @@ func WithOutput(output, err io.Writer) ClientOption {
 	}
 }
 
+// WithAudit enables keeping a log of all conversation messages, ensuring a persistent record that
+// can be useful for auditing, debugging, or further analysis.
 func WithAudit(audit io.Writer) ClientOption {
 	return func(c *ChatGPTClient) *ChatGPTClient {
 		c.auditTrail = audit
@@ -49,6 +61,8 @@ func WithAudit(audit io.Writer) ClientOption {
 	}
 }
 
+// WithInput assigns a custom input reader for ChatGPTClient, allowing the client to read input
+// from any source, offering improved flexibility and adaptability.
 func WithInput(input io.Reader) ClientOption {
 	return func(c *ChatGPTClient) *ChatGPTClient {
 		c.input = input
@@ -56,6 +70,8 @@ func WithInput(input io.Reader) ClientOption {
 	}
 }
 
+// WithFixedResponse configures the ChatGPTClient to return a predetermined response, offering
+// quicker or consistent replies, or simulating specific behavior for test cases.
 func WithFixedResponse(response string) ClientOption {
 	return func(c *ChatGPTClient) *ChatGPTClient {
 		c.fixedResponse = response
@@ -63,6 +79,8 @@ func WithFixedResponse(response string) ClientOption {
 	}
 }
 
+// WithStreaming controls the streaming mode of the ChatGPTClient, giving the user the choice
+// between streamed responses for real-time interactions or buffered responses for complete replies.
 func WithStreaming(streaming bool) ClientOption {
 	return func(c *ChatGPTClient) *ChatGPTClient {
 		c.streaming = streaming
@@ -70,6 +88,8 @@ func WithStreaming(streaming bool) ClientOption {
 	}
 }
 
+// NewChatGPTClient initializes the ChatGPTClient with the desired options, allowing customization
+// through functional options so the client can be tailored to specific needs or requirements.
 func NewChatGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
 	token, ok := os.LookupEnv("OPENAI_TOKEN")
 	if !ok {
@@ -94,8 +114,13 @@ func NewChatGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
 	return c, nil
 }
 
+// CompletionOption is used to customize the behavior of the openai.ChatCompletionRequest
+// to suit different use cases, such as setting stop words or modifying token limits.
 type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletionRequest
 
+// WithFixedResponseAPIValidate still makes an API call (ensuring request and token length validation) but
+// enforces a specific response from the chatbot, ensuring a known output
+// and avoiding unpredictable or unneccessary responses during validation.
 func WithFixedResponseAPIValidate(response string) CompletionOption {
 	return func(req *openai.ChatCompletionRequest) *openai.ChatCompletionRequest {
 		req.MaxTokens = 1
@@ -104,6 +129,8 @@ func WithFixedResponseAPIValidate(response string) CompletionOption {
 	}
 }
 
+// SetPurpose defines the purpose of the conversation, providing contextual guidance for the chatbot
+// to follow, and aligning the conversation towards a specific topic or goal.
 func (c *ChatGPTClient) SetPurpose(prompt string) {
 	purpose := "PURPOSE: " + prompt
 	m := ChatMessage{
@@ -118,6 +145,8 @@ func (c *ChatGPTClient) SetPurpose(prompt string) {
 	c.Log(RoleSystem, purpose)
 }
 
+// GetCompletion retrieves a response from the chatbot based on the conversation history and any
+// additional options applied.
 func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) {
 	if c.fixedResponse != "" {
 		return c.fixedResponse, nil
@@ -166,6 +195,9 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	return bufferedResponse(stream)
 }
 
+// RecordMessage adds a new message in the conversation context, allowing the chatbot to
+// maintain a conversation context. The role parameter provides a mechanism for inserting
+// bot or system responses in addition to user messages.
 func (c *ChatGPTClient) RecordMessage(role string, message string) {
 	m := ChatMessage{
 		Content: message,
@@ -175,6 +207,8 @@ func (c *ChatGPTClient) RecordMessage(role string, message string) {
 	c.Log(role, message)
 }
 
+// RollbackLastMessage serves as an undo functionality, removing the last message from the conversation,
+// and providing a way to recover from erroneous input or chatbot responses.
 func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
 	if len(c.chatHistory) > 1 {
 		c.chatHistory = c.chatHistory[:len(c.chatHistory)-1]
