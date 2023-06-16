@@ -9,7 +9,8 @@ import (
 	"strings"
 )
 
-// Ask sends a question to the GPT-4 API and returns a generated answer.
+// Ask sends a question to the GPT-4 API, aiming to receive a relevant and informed answer.
+// It facilitates user interaction with GPT-4 for knowledge retrieval or problem-solving.
 func Ask(question string) (answer string, err error) {
 	client, err := NewChatGPTClient()
 	if err != nil {
@@ -19,14 +20,16 @@ func Ask(question string) (answer string, err error) {
 
 }
 
-// Ask takes a user question and returns an answer from the GPT-4 API.
+// Ask sends a user question to the GPT-4 API, and expects an informed response.
+// This method is part of the ChatGPTClient and allows users to leverage the GPT-4 model for answering queries.
 func (c *ChatGPTClient) Ask(question string) (answer string, err error) {
 	c.SetPurpose("Please answer the following question as best you can.")
 	c.RecordMessage(RoleUser, question)
 	return c.GetCompletion()
 }
 
-// Card creates a set of flashcards from the content of a file or URL.
+// Card generates a set of flashcards from a given file or URL, aiming to enhance learning by summarizing important concepts.
+// It uses GPT-4 for extracting key information in a compact and easy-to-review format.
 func Card(path string) (cards []string, err error) {
 	client, err := NewChatGPTClient()
 	if err != nil {
@@ -35,8 +38,8 @@ func Card(path string) (cards []string, err error) {
 	return client.Card(path)
 }
 
-// Card generates a list of flashcards from a given file or URL
-// using a ChatContext to process the input.
+// Card creates flashcards using the content from a given file or URL.
+// This method, part of the ChatGPTClient, uses the GPT-4 API to break down and condense information into manageable flashcards.
 func (c *ChatGPTClient) Card(path string) (cards []string, err error) {
 	c.SetPurpose(`Please generate flashcards from the user provided information.
 		Answers should be short.
@@ -63,7 +66,8 @@ func (c *ChatGPTClient) Card(path string) (cards []string, err error) {
 
 }
 
-// TLDR generates a concist summary of the content from a file or URL.
+// TLDR generates a concise summary of content from a file or URL, aiming to condense important information.
+// It utilizes GPT-4 to help users quickly grasp the key points of large texts.
 func TLDR(path string) (summary string, err error) {
 	client, err := NewChatGPTClient()
 	if err != nil {
@@ -72,7 +76,8 @@ func TLDR(path string) (summary string, err error) {
 	return client.TLDR(path)
 }
 
-// TLDR generates a summary of the content from a file or URL
+// TLDR generates a brief summary of the content from a file or URL.
+// This method is part of the ChatGPTClient and leverages the GPT-4 API to present an abstract of the main text, providing a quick overview.
 func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 	c.SetPurpose("Please summarise the provided text as best you can. The shorter the better.")
 	var msg string
@@ -84,7 +89,8 @@ func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 	return c.GetCompletion()
 }
 
-// Commit takes the currently staged files, parses the diff, and generates a commit message.
+// Commit analyzes staged Git files, parsing the diff, and generates a meaningful commit message.
+// It aims to streamline the process of creating accurate and informative commit descriptions for better version control.
 func Commit() error {
 	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
 	err := cmd.Run()
@@ -113,7 +119,8 @@ func Commit() error {
 	return cmd.Run()
 }
 
-// Commit takes the currently staged files, parses the diff, and generates a commit message.
+// Commit parses the diff of staged Git files and generates an appropriate commit message.
+// This method, part of the ChatGPTClient, helps users maintain clear commit history and conveys changes in a concise and descriptive manner.
 func (c *ChatGPTClient) Commit() (summary string, err error) {
 	c.SetPurpose(`Please read the git diff provided and write an appropriate commit message.
 	Focus on the lines that start with a + (line added) or - (line removed)`)
