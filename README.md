@@ -1,3 +1,5 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/mr-joshcrane/chatproxy.svg)](https://pkg.go.dev/github.com/mr-joshcrane/chatproxy)[![License: GPL-2.0](https://img.shields.io/badge/Licence-GPL-2)](https://opensource.org/licenses/GPL-2.0)[![Go Report Card](https://goreportcard.com/badge/github.com/mr-joshcrane/chatproxy)](https://goreportcard.com/report/github.com/mr-joshcrane/chatproxy)
+
 # Chatproxy
 
 This README ghostwritten by the `Chat` CLI tool backed by ChatGPT4
