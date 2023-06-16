@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 func MessageFromFile(path string) (message string, tokenLen int, err error) {
@@ -21,7 +22,7 @@ func MessageFromFile(path string) (message string, tokenLen int, err error) {
 	}
 
 	message = fmt.Sprintf("--%s--\n%s\n", path, content)
-	tokenLen = GuessTokens(message)
+	tokenLen = guessTokens(message)
 	return message, tokenLen, nil
 }
 
@@ -71,6 +72,36 @@ func MessageToFile(content string, path string) error {
 	return nil
 }
 
-func GuessTokens(input string) int {
+func guessTokens(input string) int {
 	return len(input) / 2
+}
+
+func CreateAuditLog() (*os.File, error) {
+	auditLogDir, err := getAuditLogDir()
+	if err != nil {
+		return nil, err
+	}
+	dateTimeString := time.Now().Format("2006-01-02_15:04:05")
+	return os.Create(filepath.Join(auditLogDir, fmt.Sprintf("%s.log", dateTimeString)))
+}
+
+func getAuditLogDir() (string, error) {
+	// Use XDG_STATE_HOME if available, otherwise fallback to default
+	xdgStateHome := os.Getenv("XDG_STATE_HOME")
+	if xdgStateHome == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		xdgStateHome = filepath.Join(home, ".local", "state")
+	}
+
+	// Create your application's specific directory for storing audit logs
+	appAuditLogDir := filepath.Join(xdgStateHome, "chatproxy", "audit_logs")
+	err := os.MkdirAll(appAuditLogDir, 0700)
+	if err != nil {
+		return "", err
+	}
+
+	return appAuditLogDir, nil
 }

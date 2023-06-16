@@ -60,7 +60,7 @@ type Strategy interface {
 type FileLoad struct{ input string }
 
 func (s FileLoad) Execute(c *ChatGPTClient) error {
-	line, err := c.MessageFromFiles(s.input[1:])
+	line, err := c.inputOutput(s.input[1:])
 	if err != nil {
 		c.LogErr(err)
 		return err

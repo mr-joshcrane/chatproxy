@@ -70,11 +70,12 @@ func WithStreaming(streaming bool) ClientOption {
 	}
 }
 
-func NewChatGPTClient( opts ...ClientOption) (*ChatGPTClient, error) {
-    token, ok := os.LookupEnv("OPENAI_TOKEN"); if !ok {
-        return nil, errors.New("must have OPENAI_TOKEN env var set")
-    }
-	file, err := os.Create("audit.txt")
+func NewChatGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
+	token, ok := os.LookupEnv("OPENAI_TOKEN")
+	if !ok {
+		return nil, errors.New("must have OPENAI_TOKEN env var set")
+	}
+	file, err := CreateAuditLog()
 	if err != nil {
 		return nil, err
 	}
@@ -93,6 +94,16 @@ func NewChatGPTClient( opts ...ClientOption) (*ChatGPTClient, error) {
 	return c, nil
 }
 
+type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletionRequest
+
+func WithFixedResponseAPIValidate(response string) CompletionOption {
+	return func(req *openai.ChatCompletionRequest) *openai.ChatCompletionRequest {
+		req.MaxTokens = 1
+		req.Stop = []string{response}
+		return req
+	}
+}
+
 func (c *ChatGPTClient) SetPurpose(prompt string) {
 	purpose := "PURPOSE: " + prompt
 	m := ChatMessage{
@@ -105,16 +116,6 @@ func (c *ChatGPTClient) SetPurpose(prompt string) {
 		c.chatHistory = append(c.chatHistory, m)
 	}
 	c.Log(RoleSystem, purpose)
-}
-
-type CompletionOption func(*openai.ChatCompletionRequest) *openai.ChatCompletionRequest
-
-func WithFixedResponseAPIValidate(response string) CompletionOption {
-	return func(req *openai.ChatCompletionRequest) *openai.ChatCompletionRequest {
-		req.MaxTokens = 1
-		req.Stop = []string{response}
-		return req
-	}
 }
 
 func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) {
@@ -160,11 +161,29 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 		return req.Stop[0], nil
 	}
 	if c.streaming {
-		return StreamedResponse(c, stream)
+		return streamedResponse(c, stream)
 	}
-	return BuffedResponse(stream)
+	return bufferedResponse(stream)
 }
-func StreamedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
+
+func (c *ChatGPTClient) RecordMessage(role string, message string) {
+	m := ChatMessage{
+		Content: message,
+		Role:    role,
+	}
+	c.chatHistory = append(c.chatHistory, m)
+	c.Log(role, message)
+}
+
+func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
+	if len(c.chatHistory) > 1 {
+		c.chatHistory = c.chatHistory[:len(c.chatHistory)-1]
+	}
+	c.Log(RoleSystem, "Last message rolled back")
+	return c.chatHistory
+}
+
+func streamedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (message string, err error) {
 	color.New(color.FgGreen).Fprint(c.output, "ASSISTANT) ")
 	for {
 		response, err := stream.Recv()
@@ -183,7 +202,7 @@ func StreamedResponse(c *ChatGPTClient, stream *openai.ChatCompletionStream) (me
 	}
 }
 
-func BuffedResponse(stream *openai.ChatCompletionStream) (message string, err error) {
+func bufferedResponse(stream *openai.ChatCompletionStream) (message string, err error) {
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -196,21 +215,4 @@ func BuffedResponse(stream *openai.ChatCompletionStream) (message string, err er
 		token := response.Choices[0].Delta.Content
 		message += token
 	}
-}
-
-func (c *ChatGPTClient) RecordMessage(role string, message string) {
-	m := ChatMessage{
-		Content: message,
-		Role:    role,
-	}
-	c.chatHistory = append(c.chatHistory, m)
-	c.Log(role, message)
-}
-
-func (c *ChatGPTClient) RollbackLastMessage() []ChatMessage {
-	if len(c.chatHistory) > 1 {
-		c.chatHistory = c.chatHistory[:len(c.chatHistory)-1]
-	}
-	c.Log(RoleSystem, "Last message rolled back")
-	return c.chatHistory
 }
