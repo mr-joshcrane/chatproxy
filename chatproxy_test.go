@@ -129,7 +129,7 @@ func TestModeSwitch(t *testing.T) {
 			want:        chatproxy.FileLoad{},
 		},
 		{
-			description: "User requests file writen out",
+			description: "User requests file written out",
 			input:       "<file.txt and some random prompt",
 			want:        chatproxy.FileWrite{},
 		},
