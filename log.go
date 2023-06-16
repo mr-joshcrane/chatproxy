@@ -7,6 +7,9 @@ import (
 	"github.com/fatih/color"
 )
 
+// Log logs a chat message with the given role and message. It helps maintain a comprehensive log of interactions
+// in the ChatGPTClient. The primary purpose of this function is to clearly show which role (e.g., user, bot, system)
+// is responsible for a particular message in the conversation.
 func (c *ChatGPTClient) Log(role string, message string) {
 	m := ChatMessage{
 		Content: message,
@@ -29,10 +32,15 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 	}
 }
 
+// LogErr logs errors in the ChatGPTClient's errorStream.
+// This makes it possible to capture and handle errors in a standardized manner, enabling efficient debugging and error handling.
 func (c *ChatGPTClient) LogErr(err error) {
 	fmt.Fprintln(c.errorStream, err)
 }
 
+// Prompt formats and prints system prompts to the output. It uses yellow color to differentiate system messages
+// from user and bot messages for better visibility. The main purpose of this function is to guide user interactions
+// and ensure clear communication of instructions or system status updates.
 func (c *ChatGPTClient) Prompt(prompts ...string) {
 	for _, prompt := range prompts {
 		formattedPrompt := fmt.Sprintf("SYSTEM) %s", prompt)

@@ -12,6 +12,10 @@ import (
 	"github.com/cixtor/readability"
 )
 
+// MessageFromFile reads the contents of a file, and returns a formatted
+// message with the file name and content, as well as an estimation of
+// the token count. This function enables the bot to include file
+// contents when sending messages to the user.
 func MessageFromFile(path string) (message string, tokenLen int, err error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -30,6 +34,10 @@ func MessageFromFile(path string) (message string, tokenLen int, err error) {
 	return message, tokenLen, nil
 }
 
+// MessageFromFiles reads the contents of multiple files in a directory,
+// and returns a combined formatted message with file names and contents.
+// This function allows the bot to send messages with content from multiple
+// files at once to the user without making multiple calls.
 func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
 	message := ""
 	totalTokenLength := 0
@@ -67,6 +75,9 @@ func (c *ChatGPTClient) MessageFromFiles(path string) (string, error) {
 	return message, nil
 }
 
+// MessageToFile writes the given content string to a file with the
+// specified path. This function enables the bot to save conversation
+// logs in a file or write user-generated content to a file.
 func MessageToFile(content string, path string) error {
 	file, err := os.Create(path)
 	if err != nil {
@@ -80,6 +91,10 @@ func guessTokens(input string) int {
 	return len(input) / 2
 }
 
+// CreateAuditLog creates a new file for recording the conversation's audit
+// log with a timestamped filename. This function helps ensure
+// conversation logs are saved and timestamped, allowing the users to
+// review their chat history later.
 func CreateAuditLog() (*os.File, error) {
 	auditLogDir, err := getAuditLogDir()
 	if err != nil {
