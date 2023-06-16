@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+// Chat function initiates the chat with the user and
+// enables interaction between user and the chat proxy.
+// It orchestrates the entire conversational experience
+// with the purpose of assisting the user in various tasks.
 func Chat() error {
 	client, err := NewChatGPTClient(WithStreaming(true))
 	if err != nil {
@@ -16,6 +20,9 @@ func Chat() error {
 	return nil
 }
 
+// Chat method handles the conversational flow for
+// the ChatGPTClient, aiming to provide a seamless
+// user experience by managing prompts and strategies.
 func (c *ChatGPTClient) Chat() {
 	c.Prompt("Please describe the purpose of this assistant.")
 	scan := bufio.NewScanner(c.input)
@@ -59,6 +66,10 @@ type Strategy interface {
 
 type FileLoad struct{ input string }
 
+// Execute method for FileLoad strategy handles loading
+// file contents to be processed by ChatGPTClient, which
+// enables users to provide input via files instead of
+// just through the chat interface.
 func (s FileLoad) Execute(c *ChatGPTClient) error {
 	line, err := c.inputOutput(s.input[1:])
 	if err != nil {
@@ -77,6 +88,9 @@ func (s FileLoad) Execute(c *ChatGPTClient) error {
 
 type FileWrite struct{ input string }
 
+// Execute method for FileWrite strategy allows writing
+// output from the chat interaction to a file, offering
+// an organized and convenient way to store results.
 func (s FileWrite) Execute(c *ChatGPTClient) error {
 	path, line, ok := strings.Cut(s.input[1:], " ")
 	if !ok {
@@ -92,6 +106,9 @@ func (s FileWrite) Execute(c *ChatGPTClient) error {
 
 type Default struct{ input string }
 
+// Execute method for Default strategy is responsible for
+// managing a typical chat interaction by sending user input
+// to the OpenAI API and receiving a response.
 func (s Default) Execute(c *ChatGPTClient) error {
 	c.RecordMessage(RoleUser, s.input)
 	reply, err := c.GetCompletion()
@@ -104,11 +121,17 @@ func (s Default) Execute(c *ChatGPTClient) error {
 
 type Exit struct{}
 
+// Execute method for Exit strategy gracefully manages
+// the termination of the chat session when the user
+// decides to exit.
 func (s Exit) Execute(c *ChatGPTClient) error {
 	c.Log(RoleUser, "*exit*")
 	return io.EOF
 }
 
+// GetStrategy method selects the appropriate strategy
+// based on the user input, ensuring the correct action
+// is taken to achieve the user's desired outcome.
 func (c *ChatGPTClient) GetStrategy(input string) Strategy {
 	if strings.HasPrefix(input, ">") {
 		return FileLoad{input}
