@@ -1,22 +1,36 @@
 package chatproxy
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"strings"
 )
 
-// Chat function initiates the chat with the user and
-// enables interaction between user and the chat proxy.
-// It orchestrates the entire conversational experience
-// with the purpose of assisting the user in various tasks.
-func Chat() error {
-	client, err := NewChatGPTClient(WithStreaming(true))
-	if err != nil {
-		return err
+// Chat method handles the conversational flow for
+// the ChatGPTClient, aiming to provide a seamless
+// user experience by managing prompts and strategies.
+func (c *ChatGPTClient) Chat() {
+	c.Prompt("Please describe the purpose of this assistant.")
+	scan := bufio.NewScanner(c.input)
+
+	for scan.Scan() {
+		line := scan.Text()
+		if len(c.chatHistory) == 0 {
+			c.SetPurpose(line)
+			c.Prompt()
+			continue
+		}
+		strategy := c.GetStrategy(line)
+		err := strategy.Execute(c)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			c.LogErr(err)
+		}
+		c.Prompt()
 	}
-	client.Chat()
-	return nil
 }
 
 const (
