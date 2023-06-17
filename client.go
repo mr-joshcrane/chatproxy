@@ -91,9 +91,11 @@ func WithStreaming(streaming bool) ClientOption {
 	}
 }
 
+var NewChatGPTClient = DefaultGPTClient
+
 // NewChatGPTClient initializes the ChatGPTClient with the desired options, allowing customization
 // through functional options so the client can be tailored to specific needs or requirements.
-func NewChatGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
+func DefaultGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
 	token, ok := os.LookupEnv("OPENAI_TOKEN")
 	if !ok {
 		return nil, errors.New("must have OPENAI_TOKEN env var set")

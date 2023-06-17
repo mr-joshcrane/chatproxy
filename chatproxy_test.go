@@ -12,6 +12,75 @@ import (
 	"github.com/mr-joshcrane/chatproxy"
 )
 
+func TestAsk(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	want := "To test the Ask CLI"
+	tc := testClient(t, chatproxy.WithFixedResponse(want), chatproxy.WithOutput(buf, io.Discard))
+	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
+	chatproxy.Ask([]string{"What", "is", "the", "purpose", "of", "this", "test?"})
+	got := buf.String()
+	if !cmp.Equal(want, got) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
+func TestCard(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	want := "To test the Card CLI"
+	tc := testClient(t, chatproxy.WithFixedResponse(want), chatproxy.WithOutput(buf, os.Stderr))
+	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
+	chatproxy.Card([]string{"card", "www.example.com"})
+	got := buf.String()
+	want = fmt.Sprintf(`[%s]`, want)
+	if !cmp.Equal(want, got) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
+func TestChat(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	input := strings.NewReader("You help me test my Chat CLI\nRequest\nexit\n")
+	response := "Fixed response"
+	tc := testClient(t, chatproxy.WithFixedResponse(response), chatproxy.WithInput(input), chatproxy.WithAudit(buf))
+	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
+	chatproxy.Chat()
+	got := buf.String()
+	want := "SYSTEM) PURPOSE: You help me test my Chat CLI\nUSER) Request\nASSISTANT) Fixed response\nUSER) *exit*\n"
+	if !cmp.Equal(want, got) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
+func TestTLDR(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	want := "To test the TLDR CLI"
+	tc := testClient(t, chatproxy.WithFixedResponse(want), chatproxy.WithOutput(buf, io.Discard))
+	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
+	chatproxy.TLDR([]string{"tldr", "www.example.com"})
+	got := buf.String()
+	if !cmp.Equal(want, got) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
+func TestCommit(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	input := "Testing commit CLI"
+	tc := testClient(t, chatproxy.WithFixedResponse(input), chatproxy.WithAudit(buf))
+	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
+	chatproxy.Commit()
+	got := buf.String()
+	want := "SYSTEM) PURPOSE: Please read the git diff provided and write an appropriate commit message.\n\tFocus on the lines that start with a + (line added) or - (line removed)\n"
+	if !cmp.Equal(want, got) {
+		t.Fatal(cmp.Diff(want, got))
+	}
+}
+
 func TestReadFile(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -178,8 +247,13 @@ func TestTranscript(t *testing.T) {
 
 var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
 
+func testConstructor(opts ...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) {
+	opts = append([]chatproxy.ClientOption{SuppressOutput}, opts...)
+	return chatproxy.DefaultGPTClient(opts...)
+}
+
 func testClient(t *testing.T, opts ...chatproxy.ClientOption) *chatproxy.ChatGPTClient {
-	opts = append(opts, SuppressOutput)
+	chatproxy.NewChatGPTClient = testConstructor
 	client, err := chatproxy.NewChatGPTClient(opts...)
 	if err != nil {
 		t.Fatal(err)

@@ -32,10 +32,16 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 	}
 }
 
+// LogOut logs a message to the ChatGPTClient's output stream. This is useful for logging messages that are not
+// part of the conversation, such as instructions or system status updates.
+func (c *ChatGPTClient) LogOut(message ...any) {
+	fmt.Fprint(c.output, message...)
+}
+
 // LogErr logs errors in the ChatGPTClient's errorStream.
 // This makes it possible to capture and handle errors in a standardized manner, enabling efficient debugging and error handling.
 func (c *ChatGPTClient) LogErr(err error) {
-	fmt.Fprintln(c.errorStream, err)
+	fmt.Fprint(c.errorStream, err)
 }
 
 // Prompt formats and prints system prompts to the output. It uses yellow color to differentiate system messages
@@ -47,4 +53,8 @@ func (c *ChatGPTClient) Prompt(prompts ...string) {
 		color.New(color.FgYellow).Fprintln(c.output, formattedPrompt) // Yellow for system
 	}
 	fmt.Fprint(c.output, "USER) ")
+}
+
+func (c *ChatGPTClient) Fprint(a ...interface{}) {
+	fmt.Fprint(c.output, a...)
 }
