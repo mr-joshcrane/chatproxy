@@ -45,6 +45,15 @@ type ChatGPTClient struct {
 // and use cases, such as custom input/output handling or error reporting.
 type ClientOption func(*ChatGPTClient) *ChatGPTClient
 
+// WithToken uses the provided token for authentication
+// when creating a new ChatGPTClient.
+func WithToken(token string) ClientOption {
+	return func(c *ChatGPTClient) *ChatGPTClient {
+		c.client = openai.NewClient(token)
+		return c
+	}
+}
+
 // WithOutput allows customizing the output/error handling in the ChatGPTClient, making the client
 // more adaptable to different environments or reporting workflows.
 func WithOutput(output, err io.Writer) ClientOption {
@@ -96,16 +105,12 @@ var NewChatGPTClient = DefaultGPTClient
 // NewChatGPTClient initializes the ChatGPTClient with the desired options, allowing customization
 // through functional options so the client can be tailored to specific needs or requirements.
 func DefaultGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
-	token, ok := os.LookupEnv("OPENAI_TOKEN")
-	if !ok {
-		return nil, errors.New("must have OPENAI_TOKEN env var set")
-	}
 	file, err := CreateAuditLog()
 	if err != nil {
 		return nil, err
 	}
 	c := &ChatGPTClient{
-		client:      openai.NewClient(token),
+		client:      nil,
 		chatHistory: []ChatMessage{},
 		auditTrail:  file,
 		input:       os.Stdin,
@@ -115,6 +120,13 @@ func DefaultGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
 	}
 	for _, opt := range opts {
 		c = opt(c)
+	}
+	if c.client == nil {
+		token, ok := os.LookupEnv("OPENAI_TOKEN")
+		if !ok {
+			return nil, errors.New("must have OPENAI_TOKEN env var set or pass token explicitly")
+		}
+		c.client = openai.NewClient(token)
 	}
 	return c, nil
 }
@@ -251,7 +263,7 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 			}
 			if err.HTTPStatusCode == 401 {
 				c.LogErr(err)
-				return "", errors.New("unauthorized. Please check your OPENAI_TOKEN env var")
+				return "", errors.New("unauthorized. Please check your OPENAI_TOKEN env var or pass a token in explicitly")
 			}
 		}
 		return "", err

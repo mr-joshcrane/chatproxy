@@ -2,6 +2,7 @@ package chatproxy_test
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -133,6 +134,15 @@ func TestReadDirectory(t *testing.T) {
 
 }
 
+func TestIncorrectToken(t *testing.T) {
+	t.Parallel()
+	client := testClient(t)
+	_, err := client.Ask("This is a test")
+	if err == nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWriteFile(t *testing.T) {
 	t.Parallel()
 	path := t.TempDir() + "/temp.txt"
@@ -224,6 +234,41 @@ func TestModeSwitch(t *testing.T) {
 	}
 }
 
+func TestChat_FileOperations(t *testing.T) {
+	t.Parallel()
+	buf := new(bytes.Buffer)
+	outfile, in := setupFileOperations(t)
+	input := strings.NewReader(in)
+	client := testClient(t,
+		chatproxy.WithFixedResponse("Fixed response"),
+		chatproxy.WithInput(input),
+		chatproxy.WithAudit(buf),
+	)
+	client.Chat()
+	got := buf.String()
+	if !strings.Contains(got, "SYSTEM) PURPOSE: This is the purpose") {
+		t.Fatalf("wanted purpose, got %s", got)
+	}
+	if !strings.Contains(got, "This is the first file") {
+		t.Fatalf("wanted first file, got %s", got)
+	}
+	if !strings.Contains(got, "This is the second file") {
+		t.Fatalf("wanted second file, got %s", got)
+	}
+	exists, _ := os.Stat(outfile)
+	if exists == nil {
+		t.Fatalf("wanted %s to be created", outfile)
+	}
+	contents, err := os.ReadFile(outfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(contents) != "Fixed response\n" {
+		t.Fatalf("wanted %s, got %s", "Fixed response\n", string(contents))
+	}
+
+}
+
 func TestTranscript(t *testing.T) {
 	t.Parallel()
 	buf := new(bytes.Buffer)
@@ -245,10 +290,59 @@ func TestTranscript(t *testing.T) {
 	}
 }
 
+var runIntegration = flag.Bool("integration", false, "if true, run integration tests")
+
+func TestIntegration_StreamingResponse(t *testing.T) {
+	t.Parallel()
+	if !*runIntegration {
+		t.Skip("skipping test; only run with -integration")
+	}
+	buf := new(bytes.Buffer)
+	client, err := chatproxy.DefaultGPTClient(
+		chatproxy.WithStreaming(true),
+		chatproxy.WithOutput(buf, io.Discard),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer, err := client.Ask("This is a test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(answer) == 0 {
+		t.Fatal("answer is empty")
+	}
+	if buf.Len() == 0 {
+		t.Fatal("streaming response should stream the result to the output, did not.")
+	}
+}
+
+func TestIntegration_BufferedResponse(t *testing.T) {
+	t.Parallel()
+	if !*runIntegration {
+		t.Skip("skipping test; only run with -integration")
+	}
+	client, err := chatproxy.DefaultGPTClient(
+		chatproxy.WithStreaming(false),
+		chatproxy.WithOutput(io.Discard, io.Discard),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	answer, err := client.Ask("This is a test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(answer) == 0 {
+		t.Fatal("answer is empty")
+	}
+}
+
 var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
+var TestToken = chatproxy.WithToken("test-token")
 
 func testConstructor(opts ...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) {
-	opts = append([]chatproxy.ClientOption{SuppressOutput}, opts...)
+	opts = append([]chatproxy.ClientOption{SuppressOutput, TestToken}, opts...)
 	return chatproxy.DefaultGPTClient(opts...)
 }
 
@@ -260,4 +354,19 @@ func testClient(t *testing.T, opts ...chatproxy.ClientOption) *chatproxy.ChatGPT
 	}
 	return client
 
+}
+
+func setupFileOperations(t *testing.T) (outfile, input string) {
+	tempDir := t.TempDir()
+	outfile = tempDir + "/outfile.txt"
+	input = fmt.Sprintf("This is the purpose\n>%s\n<%s write a fixed response\nexit\n", tempDir, outfile)
+	err := os.WriteFile(tempDir+"/file1.txt", []byte("This is the first file"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.WriteFile(tempDir+"/file2.txt", []byte("This is the second file"), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return outfile, input
 }
