@@ -27,6 +27,9 @@ func Ask(args []string) int {
 		return 1
 	}
 	client.LogOut(answer)
+	if client.TranscriptPath() != "" {
+		fmt.Fprintln(client.output, "Transcript available at ", client.TranscriptPath())
+	}
 	return 0
 
 }
@@ -64,6 +67,7 @@ func Chat() int {
 		return 1
 	}
 	client.Chat()
+
 	return 0
 }
 

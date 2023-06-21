@@ -17,7 +17,11 @@ func TestAsk(t *testing.T) {
 	t.Parallel()
 	buf := new(bytes.Buffer)
 	want := "To test the Ask CLI"
-	tc := testClient(t, chatproxy.WithFixedResponse(want), chatproxy.WithOutput(buf, io.Discard))
+	tc := testClient(t,
+		chatproxy.WithFixedResponse(want),
+		chatproxy.WithOutput(buf, io.Discard),
+		chatproxy.WithTranscript(io.Discard),
+	)
 	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
 	chatproxy.Ask([]string{"What", "is", "the", "purpose", "of", "this", "test?"})
 	got := buf.String()
@@ -45,7 +49,7 @@ func TestChat(t *testing.T) {
 	buf := new(bytes.Buffer)
 	input := strings.NewReader("You help me test my Chat CLI\nRequest\nexit\n")
 	response := "Fixed response"
-	tc := testClient(t, chatproxy.WithFixedResponse(response), chatproxy.WithInput(input), chatproxy.WithAudit(buf))
+	tc := testClient(t, chatproxy.WithFixedResponse(response), chatproxy.WithInput(input), chatproxy.WithTranscript(buf))
 	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
 	chatproxy.Chat()
 	got := buf.String()
@@ -72,7 +76,7 @@ func TestCommit(t *testing.T) {
 	t.Parallel()
 	buf := new(bytes.Buffer)
 	input := "Testing commit CLI"
-	tc := testClient(t, chatproxy.WithFixedResponse(input), chatproxy.WithAudit(buf))
+	tc := testClient(t, chatproxy.WithFixedResponse(input), chatproxy.WithTranscript(buf))
 	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
 	chatproxy.Commit()
 	got := buf.String()
@@ -242,7 +246,7 @@ func TestChat_FileOperations(t *testing.T) {
 	client := testClient(t,
 		chatproxy.WithFixedResponse("Fixed response"),
 		chatproxy.WithInput(input),
-		chatproxy.WithAudit(buf),
+		chatproxy.WithTranscript(buf),
 	)
 	client.Chat()
 	got := buf.String()
@@ -273,7 +277,7 @@ func TestTranscript(t *testing.T) {
 	t.Parallel()
 	buf := new(bytes.Buffer)
 	input := strings.NewReader("Return fixed responses\nQuestion?\nOther question?\nexit\n")
-	client := testClient(t, chatproxy.WithAudit(buf), chatproxy.WithInput(input), chatproxy.WithFixedResponse("Fixed response"))
+	client := testClient(t, chatproxy.WithTranscript(buf), chatproxy.WithInput(input), chatproxy.WithFixedResponse("Fixed response"))
 	client.Chat()
 	want := []string{
 		"SYSTEM) PURPOSE: Return fixed responses",

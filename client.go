@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -31,14 +32,14 @@ const (
 // ChatGPTClient manages interactions with a GPT-based chatbot, providing a way
 // to organize the conversation, handle input/output, and maintain an audit trail.
 type ChatGPTClient struct {
-	client        *openai.Client
-	chatHistory   []ChatMessage
-	input         io.Reader
-	output        io.Writer
-	errorStream   io.Writer
-	auditTrail    io.Writer
-	fixedResponse string
-	streaming     bool
+	client         *openai.Client
+	chatHistory    []ChatMessage
+	input          io.Reader
+	output         io.Writer
+	errorStream    io.Writer
+	transcript     io.Writer
+	fixedResponse  string
+	streaming      bool
 }
 
 // ClientOption is used to flexibly configure the ChatGPTClient to meet various requirements
@@ -64,11 +65,11 @@ func WithOutput(output, err io.Writer) ClientOption {
 	}
 }
 
-// WithAudit enables keeping a log of all conversation messages, ensuring a persistent record that
+// WithTranscript enables keeping a log of all conversation messages, ensuring a persistent record that
 // can be useful for auditing, debugging, or further analysis.
-func WithAudit(audit io.Writer) ClientOption {
+func WithTranscript(audit io.Writer) ClientOption {
 	return func(c *ChatGPTClient) *ChatGPTClient {
-		c.auditTrail = audit
+		c.transcript = audit
 		return c
 	}
 }
@@ -110,13 +111,13 @@ func DefaultGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
 		return nil, err
 	}
 	c := &ChatGPTClient{
-		client:      nil,
-		chatHistory: []ChatMessage{},
-		auditTrail:  file,
-		input:       os.Stdin,
-		output:      os.Stdout,
-		errorStream: os.Stderr,
-		streaming:   false,
+		client:         nil,
+		chatHistory:    []ChatMessage{},
+		transcript:     file,
+		input:          os.Stdin,
+		output:         os.Stdout,
+		errorStream:    os.Stderr,
+		streaming:      false,
 	}
 	for _, opt := range opts {
 		c = opt(c)
@@ -129,6 +130,13 @@ func DefaultGPTClient(opts ...ClientOption) (*ChatGPTClient, error) {
 		c.client = openai.NewClient(token)
 	}
 	return c, nil
+}
+
+func (c *ChatGPTClient) TranscriptPath() string {
+	if file, ok := c.transcript.(*os.File); ok {
+		return file.Name()
+	}
+	return ""
 }
 
 // Ask sends a user question to the GPT-4 API, and expects an informed response.
@@ -254,14 +262,14 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 
 	stream, err := c.client.CreateChatCompletionStream(context.Background(), req)
 	if err != nil {
-		err, ok := err.(*openai.APIError)
-		if ok {
-			if err.HTTPStatusCode == 400 {
+		var apiErr *openai.APIError
+		if errors.As(err, &apiErr) {
+			if apiErr.HTTPStatusCode == http.StatusBadRequest {
 				c.LogErr(err)
 				c.RollbackLastMessage()
-				return fmt.Sprintf("Backing out of transaction: %s", err.Message), nil
+				return fmt.Sprintf("Backing out of transaction: %s", apiErr.Message), nil
 			}
-			if err.HTTPStatusCode == 401 {
+			if apiErr.HTTPStatusCode == http.StatusUnauthorized {
 				c.LogErr(err)
 				return "", errors.New("unauthorized. Please check your OPENAI_TOKEN env var or pass a token in explicitly")
 			}

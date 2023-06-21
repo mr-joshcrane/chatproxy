@@ -22,11 +22,11 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 	formatted := fmt.Sprintf("%s) %s", strings.ToUpper(m.Role), m.Content)
 	switch m.Role {
 	case RoleBot:
-		fmt.Fprintln(c.auditTrail, formatted)
+		fmt.Fprintln(c.transcript, formatted)
 	case RoleUser:
-		fmt.Fprintln(c.auditTrail, formatted)
+		fmt.Fprintln(c.transcript, formatted)
 	case RoleSystem:
-		fmt.Fprintln(c.auditTrail, formatted)
+		fmt.Fprintln(c.transcript, formatted)
 	default:
 		fmt.Fprintln(c.output, formatted) // Default output with no color
 	}
@@ -35,7 +35,8 @@ func (c *ChatGPTClient) logWithFormatting(m ChatMessage) {
 // LogOut logs a message to the ChatGPTClient's output stream. This is useful for logging messages that are not
 // part of the conversation, such as instructions or system status updates.
 func (c *ChatGPTClient) LogOut(message ...any) {
-	fmt.Fprint(c.output, message...)
+	fmt.Fprintln(c.output, message...)
+	fmt.Fprintln(c.transcript, message...)
 }
 
 // LogErr logs errors in the ChatGPTClient's errorStream.
