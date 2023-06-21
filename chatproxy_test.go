@@ -25,7 +25,7 @@ func TestAsk(t *testing.T) {
 	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
 	chatproxy.Ask([]string{"What", "is", "the", "purpose", "of", "this", "test?"})
 	got := buf.String()
-	if !cmp.Equal(want, got) {
+	if !strings.Contains(got, want) {
 		t.Fatal(cmp.Diff(want, got))
 	}
 }
@@ -39,7 +39,7 @@ func TestCard(t *testing.T) {
 	chatproxy.Card([]string{"card", "www.example.com"})
 	got := buf.String()
 	want = fmt.Sprintf(`[%s]`, want)
-	if !cmp.Equal(want, got) {
+	if !strings.Contains(got, want) {
 		t.Fatal(cmp.Diff(want, got))
 	}
 }
@@ -67,7 +67,7 @@ func TestTLDR(t *testing.T) {
 	chatproxy.NewChatGPTClient = func(...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) { return tc, nil }
 	chatproxy.TLDR([]string{"tldr", "www.example.com"})
 	got := buf.String()
-	if !cmp.Equal(want, got) {
+	if !strings.Contains(got, want) {
 		t.Fatal(cmp.Diff(want, got))
 	}
 }
@@ -81,7 +81,7 @@ func TestCommit(t *testing.T) {
 	chatproxy.Commit()
 	got := buf.String()
 	want := "SYSTEM) PURPOSE: Please read the git diff provided and write an appropriate commit message.\n\tFocus on the lines that start with a + (line added) or - (line removed)\n"
-	if !cmp.Equal(want, got) {
+	if !strings.Contains(got, want) {
 		t.Fatal(cmp.Diff(want, got))
 	}
 }

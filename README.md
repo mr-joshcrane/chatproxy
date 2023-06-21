@@ -122,10 +122,10 @@ tldr https://example.site.com
 A brief summary of your website.
 ```
 
-## OPENAI_TOKEN Environment Variable
-Purpose: The OPENAI_TOKEN is used to authenticate and authorize API access to OpenAI's GPT-4 services.
+## OPENAI_API_KEY Environment Variable
+Purpose: The OPENAI_API_KEY is used to authenticate and authorize API access to OpenAI's GPT-4 services.
 
-Usage: Store the token as an environment variable (`OPENAI_TOKEN="YOUR_TOKEN"`) in your system or application, so that the library can access it automatically.
+Usage: Store the token as an environment variable (`OPENAI_API_KEY="YOUR_TOKEN"`) in your system or application, so that the library can access it automatically.
 
 Obtaining a token: You can get an API key by creating an account on OpenAI's platform at https://beta.openai.com/signup/. After signing up, visit the API Keys section in your account to obtain a token.
 
