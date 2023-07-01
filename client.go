@@ -1,6 +1,7 @@
 package chatproxy
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -286,6 +287,16 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 		return streamedResponse(c, stream)
 	}
 	return bufferedResponse(stream)
+}
+
+func (c *ChatGPTClient) Chunk(contents io.Reader) []string {
+	var chunks []string
+	scanner := bufio.NewScanner(contents)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		chunks = append(chunks, scanner.Text())
+	}
+	return chunks
 }
 
 // RecordMessage adds a new message in the conversation context, allowing the chatbot to

@@ -342,6 +342,36 @@ func TestIntegration_BufferedResponse(t *testing.T) {
 	}
 }
 
+func TestChunk(t *testing.T) {
+	t.Parallel()
+	c := testClient(t)
+	contents := strings.NewReader("Chunk one\nchunk two\nchunk three\n")
+	got := c.Chunk(contents)
+	want := []string{
+		"Chunk one",
+		"chunk two",
+		"chunk three",
+	}
+	if !cmp.Equal(want, got) {
+		t.Fatalf(cmp.Diff(want, got))
+	}
+}
+
+func TestChunkStripsWhitespace(t *testing.T) {
+	t.Parallel()
+	c := testClient(t)
+	contents := strings.NewReader("Chunk one\n\n\nchunk two\n\n\nchunk three\n     \n\n")
+	got := c.Chunk(contents)
+	want := []string{
+		"Chunk one",
+		"chunk two",
+		"chunk three",
+	}
+	if !cmp.Equal(want, got) {
+		t.Fatalf(cmp.Diff(want, got))
+	}
+}
+
 var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
 var TestToken = chatproxy.WithToken("test-token")
 
