@@ -125,9 +125,9 @@ func getAuditLogDir() (string, error) {
 	return appAuditLogDir, nil
 }
 
-// inputOutput takes a path, checks if it is a file or URL, and returns the
+// GetContent takes a path, checks if it is a file or URL, and returns the
 // contents of the file or the text of the URL.
-func (c *ChatGPTClient) inputOutput(path string) (msg string, err error) {
+func (c *ChatGPTClient) GetContent(path string) (msg string, err error) {
 	_, err = os.Stat(path)
 	if err == nil {
 		msg, err = c.MessageFromFiles(path)

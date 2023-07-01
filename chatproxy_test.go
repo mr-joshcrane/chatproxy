@@ -140,7 +140,7 @@ func TestReadDirectory(t *testing.T) {
 
 func TestIncorrectToken(t *testing.T) {
 	t.Parallel()
-	client := testClient(t)
+	client := testClient(t, chatproxy.WithToken("incorrect"))
 	_, err := client.Ask("This is a test")
 	if err == nil {
 		t.Fatal(err)
@@ -372,8 +372,38 @@ func TestChunkStripsWhitespace(t *testing.T) {
 	}
 }
 
+func TestVectorize(t *testing.T) {
+	// this is an integration test, but it's not run by Default
+	if !*runIntegration {
+		t.Skip("skipping test; only run with -integration")
+	}
+	t.Parallel()
+	c := testClient(t)
+	vector, err := c.Vectorize("test.txt", []string{"This is a test", "How will it go?"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vector) != 2 {
+		t.Fatalf("wanted 2, got %d", len(vector))
+	}
+	v2 := vector[1]
+	if v2.Origin != "test.txt" {
+		t.Fatalf("wanted test.txt, got %s", v2.Origin)
+	}
+	if v2.PlainText != "How will it go?" {
+		v2 := vector[1]
+		if v2.OriginSequence != 2 {
+			t.Fatalf("wanted 2, got %d", v2.OriginSequence)
+		}
+		t.Fatalf("wanted How will it go?, got %s", v2.PlainText)
+	}
+	if len(v2.Vector) == 0 {
+		t.Fatalf("wanted non-empty vector, got empty vector")
+	}
+}
+
 var SuppressOutput = chatproxy.WithOutput(io.Discard, io.Discard)
-var TestToken = chatproxy.WithToken("test-token")
+var TestToken = chatproxy.WithToken(os.Getenv("OPENAI_API_KEY"))
 
 func testConstructor(opts ...chatproxy.ClientOption) (*chatproxy.ChatGPTClient, error) {
 	opts = append([]chatproxy.ClientOption{SuppressOutput, TestToken}, opts...)

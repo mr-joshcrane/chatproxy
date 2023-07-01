@@ -41,6 +41,14 @@ type ChatGPTClient struct {
 	transcript    io.Writer
 	fixedResponse string
 	streaming     bool
+	embeddings    []Embedding
+}
+
+type Embedding struct {
+	Origin         string
+	OriginSequence int
+	PlainText      string
+	Vector         []float32
 }
 
 // ClientOption is used to flexibly configure the ChatGPTClient to meet various requirements
@@ -162,7 +170,7 @@ func (c *ChatGPTClient) Card(path string) (cards []string, err error) {
 		Answer: It means that any class that is the child of another class should be able to be used in place of the parent class.
 		---
 `)
-	msg, err := c.inputOutput(path)
+	msg, err := c.GetContent(path)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +189,7 @@ func (c *ChatGPTClient) Card(path string) (cards []string, err error) {
 func (c *ChatGPTClient) TLDR(path string) (summary string, err error) {
 	c.SetPurpose("Please summarise the provided text as best you can. The shorter the better.")
 	var msg string
-	msg, err = c.inputOutput(path)
+	msg, err = c.GetContent(path)
 	if err != nil {
 		return "", err
 	}
@@ -302,6 +310,28 @@ func (c *ChatGPTClient) Chunk(contents io.Reader) []string {
 		chunks = append(chunks, chunk)
 	}
 	return chunks
+}
+
+func (c *ChatGPTClient) Vectorize(origin string, s []string) ([]Embedding, error) {
+	var embeddings []Embedding
+	req := openai.EmbeddingRequest{
+		Model: openai.AdaEmbeddingV2,
+		Input: s,
+	}
+	resp, err := c.client.CreateEmbeddings(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	for i, embedding := range resp.Data {
+		embeddings = append(embeddings, Embedding{
+			Origin:         origin,
+			OriginSequence: i,
+			PlainText:      s[i],
+			Vector:         embedding.Embedding,
+		})
+
+	}
+	return embeddings, nil
 }
 
 // RecordMessage adds a new message in the conversation context, allowing the chatbot to

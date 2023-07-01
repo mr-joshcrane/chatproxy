@@ -58,7 +58,7 @@ type FileLoad struct{ input string }
 // enables users to provide input via files instead of
 // just through the chat interface.
 func (s FileLoad) Execute(c *ChatGPTClient) error {
-	line, err := c.inputOutput(s.input[1:])
+	line, err := c.GetContent(s.input[1:])
 	if err != nil {
 		c.LogErr(err)
 		return err
