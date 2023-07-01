@@ -294,7 +294,12 @@ func (c *ChatGPTClient) Chunk(contents io.Reader) []string {
 	scanner := bufio.NewScanner(contents)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
-		chunks = append(chunks, scanner.Text())
+		chunk := scanner.Text()
+		chunk = strings.TrimSpace(chunk)
+		if len(chunk) == 0 {
+			continue
+		}
+		chunks = append(chunks, chunk)
 	}
 	return chunks
 }
