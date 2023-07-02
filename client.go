@@ -7,9 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"github.com/fatih/color"
@@ -48,7 +50,17 @@ type Embedding struct {
 	Origin         string
 	OriginSequence int
 	PlainText      string
-	Vector         []float32
+	Vector         []float64
+}
+
+type Similarities struct {
+	Query           string
+	RelevantVectors []Similarity
+}
+
+type Similarity struct {
+	PlainText string
+	Score     float64
 }
 
 // ClientOption is used to flexibly configure the ChatGPTClient to meet various requirements
@@ -297,10 +309,31 @@ func (c *ChatGPTClient) GetCompletion(opts ...CompletionOption) (string, error) 
 	return bufferedResponse(stream)
 }
 
-func (c *ChatGPTClient) Chunk(contents io.Reader) []string {
+func (c *ChatGPTClient) CreateEmbeddings(origin string, contents io.Reader) {
+	chunks := c.Chunk(contents, 500)
+	// Create batches of 500
+	var batches [][]string
+	for i := 0; i < len(chunks); i += 500 {
+		end := i + 500
+		if end > len(chunks) {
+			end = len(chunks)
+		}
+		batches = append(batches, chunks[i:end])
+	}
+	for _, batch := range batches {
+		embedding, err := c.Vectorize(origin, batch)
+		if err != nil {
+			c.LogErr(err)
+			continue
+		}
+		c.embeddings = append(c.embeddings, embedding...)
+	}
+}
+
+func (c *ChatGPTClient) Chunk(contents io.Reader, chunkSize int) []string {
 	var chunks []string
 	scanner := bufio.NewScanner(contents)
-	scanner.Split(bufio.ScanLines)
+	scanner.Split(bufio.ScanWords)
 	for scanner.Scan() {
 		chunk := scanner.Text()
 		chunk = strings.TrimSpace(chunk)
@@ -309,29 +342,93 @@ func (c *ChatGPTClient) Chunk(contents io.Reader) []string {
 		}
 		chunks = append(chunks, chunk)
 	}
-	return chunks
+	var groupedChunks []string
+	if len(chunks) < chunkSize {
+		groupedChunks = append(groupedChunks, strings.Join(chunks, " "))
+	} else {
+		for i := 0; i < len(chunks); i += chunkSize {
+			end := i + chunkSize
+			if end > len(chunks) {
+				end = len(chunks)
+			}
+			groupedChunks = append(groupedChunks, strings.Join(chunks[i:end], " "))
+		}
+	}
+
+	return groupedChunks
 }
 
 func (c *ChatGPTClient) Vectorize(origin string, s []string) ([]Embedding, error) {
 	var embeddings []Embedding
+	emb := s
 	req := openai.EmbeddingRequest{
 		Model: openai.AdaEmbeddingV2,
-		Input: s,
+		Input: emb,
 	}
 	resp, err := c.client.CreateEmbeddings(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
+
 	for i, embedding := range resp.Data {
+		v := float32ToFloat64(embedding.Embedding)
 		embeddings = append(embeddings, Embedding{
 			Origin:         origin,
-			OriginSequence: i,
+			OriginSequence: i + 1,
 			PlainText:      s[i],
-			Vector:         embedding.Embedding,
+			Vector:         v,
 		})
 
 	}
 	return embeddings, nil
+}
+
+func float32ToFloat64(f []float32) []float64 {
+	var d []float64
+	for _, v := range f {
+		d = append(d, float64(v))
+	}
+	return d
+}
+
+func (c *ChatGPTClient) Relevant(query string) (Similarities, error) {
+	var similarities Similarities
+	similarities.Query = query
+	// Vectorize the query
+	q, err := c.Vectorize("query", []string{query})
+	if err != nil {
+		return Similarities{}, err
+	}
+	for _, v := range c.embeddings {
+		similarity := Similarity{
+			PlainText: v.PlainText,
+			Score:     cosineSimilarity(q[0].Vector, v.Vector),
+		}
+		similarities.RelevantVectors = append(similarities.RelevantVectors, similarity)
+	}
+	return similarities, nil
+}
+
+func (s Similarities) Top(n int) []string {
+	var top []string
+	sort.Slice(s.RelevantVectors, func(i, j int) bool {
+		return s.RelevantVectors[i].Score > s.RelevantVectors[j].Score
+	})
+	fmt.Println(len(s.RelevantVectors))
+	for i := 0; i < n; i++ {
+		top = append(top, s.RelevantVectors[i].PlainText)
+	}
+	return top
+}
+
+func cosineSimilarity(a, b []float64) float64 {
+	var dot, magA, magB float64
+	for i := range a {
+		dot += a[i] * b[i]
+		magA += math.Pow(a[i], 2)
+		magB += math.Pow(b[i], 2)
+	}
+	return dot / (math.Sqrt(magA) * math.Sqrt(magB))
 }
 
 // RecordMessage adds a new message in the conversation context, allowing the chatbot to

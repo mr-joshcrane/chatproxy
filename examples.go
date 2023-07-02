@@ -34,6 +34,46 @@ func Ask(args []string) int {
 
 }
 
+func BotField(args []string) int {
+	c, err := NewChatGPTClient()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	c.output = os.Stdout
+	c.errorStream = os.Stderr
+	if len(args) == 1 {
+		c.LogErr(fmt.Errorf("must ask a question"))
+		return 1
+	}
+	content, err := c.GetContent("https://go.dev/ref/spec")
+	if err != nil {
+		c.LogErr(err)
+		return 1
+	}
+	r := strings.NewReader(content)
+	c.CreateEmbeddings("GO SPECIFICATION", r)
+	question := strings.Join(args[1:], " ")
+	similarities, err := c.Relevant(question)
+	if err != nil {
+		c.LogErr(err)
+		return 1
+	}
+	top := similarities.Top(3)
+	c.RecordMessage(RoleUser, `What follows are some snippets of the latest Golang Specification
+		Please consider this canonical and up to date information and use it to answer questions.`)
+	for _, s := range top {
+		c.RecordMessage(RoleUser, s)
+	}
+	msg, err := c.Ask(question)
+	if err != nil {
+		c.LogErr(err)
+		return 1
+	}
+	c.LogOut(msg)
+	return 0
+}
+
 // Card generates a set of flashcards from a given file or URL, aiming to enhance learning by summarizing important concepts.
 // It uses GPT-4 for extracting key information in a compact and easy-to-review format.
 func Card(args []string) int {

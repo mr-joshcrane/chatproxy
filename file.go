@@ -26,7 +26,7 @@ func MessageFromFile(path string) (message string, tokenLen int, err error) {
 	scanner := bufio.NewScanner(file)
 	content := ""
 	for scanner.Scan() {
-		content += scanner.Text()
+		content += scanner.Text() + "\n"
 	}
 
 	message = fmt.Sprintf("--%s--\n%s\n", path, content)

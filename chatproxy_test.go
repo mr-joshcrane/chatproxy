@@ -30,6 +30,12 @@ func TestAsk(t *testing.T) {
 	}
 }
 
+func TestBotfield(t *testing.T) {
+	t.Parallel()
+	chatproxy.BotField([]string{"botfield", "Tell me about the ANY keyword"})
+	t.Fatal()
+}
+
 func TestCard(t *testing.T) {
 	t.Parallel()
 	buf := new(bytes.Buffer)
@@ -130,7 +136,7 @@ func TestReadDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := fmt.Sprintf("--%s--\n%s\n--%s--\n%s\n", c1path, c1contents, c2path, c2contents)
+	want := fmt.Sprintf("--%s--\n%s\n\n--%s--\n%s\n\n", c1path, c1contents, c2path, c2contents)
 
 	if !cmp.Equal(want, got) {
 		t.Fatal(cmp.Diff(want, got))
@@ -346,7 +352,7 @@ func TestChunk(t *testing.T) {
 	t.Parallel()
 	c := testClient(t)
 	contents := strings.NewReader("Chunk one\nchunk two\nchunk three\n")
-	got := c.Chunk(contents)
+	got := c.Chunk(contents, 500)
 	want := []string{
 		"Chunk one",
 		"chunk two",
@@ -361,7 +367,7 @@ func TestChunkStripsWhitespace(t *testing.T) {
 	t.Parallel()
 	c := testClient(t)
 	contents := strings.NewReader("Chunk one\n\n\nchunk two\n\n\nchunk three\n     \n\n")
-	got := c.Chunk(contents)
+	got := c.Chunk(contents, 500)
 	want := []string{
 		"Chunk one",
 		"chunk two",
@@ -399,6 +405,28 @@ func TestVectorize(t *testing.T) {
 	}
 	if len(v2.Vector) == 0 {
 		t.Fatalf("wanted non-empty vector, got empty vector")
+	}
+}
+
+func TestRelevant(t *testing.T) {
+	t.Parallel()
+	contents := []string{"The dog ran fast", "Time flies like an arrow", "The lion sleeps in the sun"}
+	question := "What is the dog doing?"
+	c := testClient(t)
+	r := strings.NewReader(strings.Join(contents, "\n"))
+	c.CreateEmbeddings("test.txt", r)
+	similarities, err := c.Relevant(question)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"The dog ran fast",
+		"The lion sleeps in the sun",
+		"Time flies like an arrow",
+	}
+	got := similarities.Top(3)
+	if !cmp.Equal(want, got) {
+		t.Fatalf(cmp.Diff(want, got))
 	}
 }
 
