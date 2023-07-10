@@ -100,7 +100,7 @@ func CreateAuditLog() (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	dateTimeString := time.Now().Format("2006-01-02_15:04:05")
+	dateTimeString := time.Now().Format("2006-01-02_15-04-05")
 	return os.Create(filepath.Join(auditLogDir, fmt.Sprintf("%s.log", dateTimeString)))
 }
 
